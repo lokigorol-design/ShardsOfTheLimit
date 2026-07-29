@@ -1,0 +1,8 @@
+{
+  "name": "ShardsOfTheLimit.Gameplay",
+  "rootNamespace": "ShardsOfTheLimit",
+  "references": [
+    "ShardsOfTheLimit.Domain"
+  ],
+  "autoReferenced": true
+}

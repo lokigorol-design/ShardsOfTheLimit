@@ -1,0 +1,12 @@
+{
+  "name": "ShardsOfTheLimit.PlayModeTests",
+  "rootNamespace": "ShardsOfTheLimit.Tests",
+  "references": [
+    "ShardsOfTheLimit.Domain",
+    "ShardsOfTheLimit.Gameplay"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

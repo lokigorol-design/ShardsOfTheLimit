@@ -1,0 +1,5 @@
+{
+  "name": "ShardsOfTheLimit.Domain",
+  "rootNamespace": "ShardsOfTheLimit.Domain",
+  "autoReferenced": true
+}

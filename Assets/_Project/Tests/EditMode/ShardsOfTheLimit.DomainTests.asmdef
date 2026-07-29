@@ -1,0 +1,14 @@
+{
+  "name": "ShardsOfTheLimit.DomainTests",
+  "rootNamespace": "ShardsOfTheLimit.Tests",
+  "references": [
+    "ShardsOfTheLimit.Domain"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": false
+}

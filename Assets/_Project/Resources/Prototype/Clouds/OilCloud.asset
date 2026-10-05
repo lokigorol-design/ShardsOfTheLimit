@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.CloudDefinition
   stableId: Oil Cloud
   status: {fileID: 11400000, guid: 763a22256079bf14d83656675a823ff7, type: 2}
-  areaShape: {fileID: 11400000, guid: d216c34f26d4fea42a07c69ccbaa38fb, type: 2}
+  areaShape: {fileID: 11400000, guid: e2500000000000000000000000000023, type: 2}
   durationTicks: 300
   pulseInterval: 100
   movementInterval: 100

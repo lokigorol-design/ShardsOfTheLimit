@@ -43,42 +43,67 @@ namespace ShardsOfTheLimit.Tests
         { Cloud(); world.ProcessTick(100); world.ProcessTick(200); Assert.That(target.GetStacks("POISON"),Is.EqualTo(1)); }
         [Test] public void ToxicCocktailDoublesCorrespondingStacks()
         { world.Register(owner,new PassiveModifiers(2)); Cloud(); world.ProcessTick(100); Assert.That(target.GetStacks("POISON"),Is.EqualTo(2)); }
-        [Test] public void NativeMireRequiresInstanceOwnerNotSpecies()
+        [Test] public void NativeMireIgnoresAnyCloudIncludingForeignOnes()
         {
-            var copy = Unit("owner",C(2),Team.Player);
-            world.Register(target,new PassiveModifiers(nativeMire:true,defense:7,heal:8));
-            Cloud(source:copy,speed:0);
-            Assert.That(world.IsInsideOwnCloud(target,target.Cell),Is.False); Assert.That(target.DefenseBonus,Is.Zero);
-            Cloud(source:target,speed:0); Assert.That(target.DefenseBonus,Is.EqualTo(7));
+            var stranger = Unit("stranger",C(5),Team.Opponent);
+            world.Register(target,new PassiveModifiers(nativeMire:true,healPercent:5));
+            Cloud(source:stranger,speed:0); Cloud("CORROSION",source:owner,speed:0);
+            world.ProcessTick(100);
+            Assert.That(target.Statuses,Is.Empty,"Native Mire is immune to negative effects of any cloud.");
         }
-        [Test] public void NativeMireOverlapHealsAndDefendsOnceAndEndsOnExit()
+        [Test] public void NativeMireHealsFivePercentInAnyCloudOnceAndStopsOnExit()
         {
             CombatEffectResolver.Apply(new[] { CombatEffectCalculator.Damage(target,target.ResourceState,60) });
-            world.Register(target,new PassiveModifiers(nativeMire:true,defense:5,heal:6));
-            Cloud(source:target,speed:0); Cloud(source:target,speed:0);
+            world.Register(target,new PassiveModifiers(nativeMire:true,healPercent:5));
+            Cloud(source:owner,speed:0); Cloud(source:owner,speed:0);
             world.OnActivation(target);
-            Assert.That(target.CurrentHealth,Is.EqualTo(86)); Assert.That(target.DefenseBonus,Is.EqualTo(5));
-            target.MoveTo(C(3)); Assert.That(target.DefenseBonus,Is.Zero);
-            world.OnActivation(target); Assert.That(target.CurrentHealth,Is.EqualTo(86));
+            Assert.That(target.CurrentHealth,Is.EqualTo(85),"5% of 100 once, even inside two overlapping foreign clouds.");
+            target.MoveTo(C(3));
+            world.OnActivation(target); Assert.That(target.CurrentHealth,Is.EqualTo(85));
         }
-        [Test] public void VenomousMudCreatesCloudWithoutChangingPreviewState()
+        [Test] public void MudSpitSlowsAndStickyMudImmobilizesInstead()
         {
             var ability = Resources.Load<AbilityDefinition>("Prototype/Abilities/MudSpit");
             var original = Resources.Load<PassiveModifierDefinition>("Prototype/Passives/BlightgulletBranches");
+            var preview = AbilityRuntime.Preview(ability,grid,owner,target.Cell,new[] {owner,target},0,world,original);
+            Assert.That(preview.Results.OfType<StatusAppliedResult>().Single().State.Rules.Mechanic,Is.EqualTo(StatusMechanic.Slow));
+            Assert.That(-preview.Results.OfType<DamageResult>().Single().HealthDelta - preview.Results.OfType<DamageResult>().Single().ShieldDelta,
+                Is.EqualTo(11),"0,8 x ATK 14 = 11.2 against Defense 0.");
+
             var modifier = Object.Instantiate(original);
             try
             {
-                modifier.venomousMud = true;
-                var preview = AbilityRuntime.Preview(ability,grid,owner,target.Cell,new[] {owner,target},0,world,modifier);
-                Assert.That(world.Clouds,Is.Empty); Assert.That(target.IsImmobilized,Is.False);
-                Assert.That(preview.Clouds.Count,Is.EqualTo(1));
-                var actual = AbilityRuntime.Execute(ability,grid,owner,target.Cell,new[] {owner,target},0,world,modifier);
-                Assert.That(actual.Clouds[0].OccupiedCells,Is.EquivalentTo(preview.Clouds[0].OccupiedCells));
-                Assert.That(world.Clouds.Single().Rules.Status.Id,Is.EqualTo("POISON"));
-                Assert.That(world.Clouds.Single().OwnerId,Is.EqualTo(owner.Id));
+                modifier.stickyMud = true;
+                AbilityRuntime.Execute(ability,grid,owner,target.Cell,new[] {owner,target},0,world,modifier);
                 Assert.That(target.IsImmobilized,Is.True);
+                Assert.That(target.GetMechanicStacks(StatusMechanic.Slow),Is.Zero);
             }
             finally { Object.DestroyImmediate(modifier); }
+        }
+        [Test] public void ReelingPullTakesFirstResonantOnLineAndDealsDamage()
+        {
+            var ability = Resources.Load<AbilityDefinition>("Prototype/Abilities/TonguePull");
+            Assert.That(ability.StableId,Is.EqualTo("ReelingPull"));
+            var ally = Unit("ally",C(2),Team.Player); target.MoveTo(C(3));
+            var units = new[] { owner,ally,target };
+            var targets = AbilityRuntime.GetTargetableCells(ability,grid,owner,units);
+            Assert.That(targets,Has.Member(ally.Cell),"Friendly resonants can be pulled too.");
+            Assert.That(targets,Has.No.Member(target.Cell),"The ally blocks the line.");
+            ally.MoveTo(C(1,3));
+            AbilityRuntime.Execute(ability,grid,owner,target.Cell,units);
+            Assert.That(target.Cell,Is.EqualTo(C(1)));
+            Assert.That(target.CurrentShield,Is.EqualTo(36),"0,3 x ATK 14 = 4.2 → 4.");
+        }
+        [Test] public void CloudShapesMatchDesignCards()
+        {
+            var corrosion = Resources.Load<AbilityDefinition>("Prototype/Abilities/CorrosionCloud");
+            var oil = Resources.Load<AbilityDefinition>("Prototype/Abilities/OilCloud");
+            var poison = Resources.Load<AbilityDefinition>("Prototype/Abilities/PoisonCloud");
+            var big = new TacticalGrid(Enumerable.Range(0,9).SelectMany(x => Enumerable.Range(0,9).Select(y => new GridCell(C(x,y),0,true))));
+            Assert.That(AbilityRuntime.GetImpactCells(poison,big,C(4,4)).Count,Is.EqualTo(5));
+            Assert.That(AbilityRuntime.GetImpactCells(corrosion,big,C(4,4)).Count,Is.EqualTo(13));
+            Assert.That(AbilityRuntime.GetImpactCells(oil,big,C(4,4)).Count,Is.EqualTo(9));
+            Assert.That(poison.Cooldown,Is.EqualTo(2)); Assert.That(corrosion.Cooldown,Is.EqualTo(4)); Assert.That(oil.Cooldown,Is.EqualTo(4));
         }
         [Test] public void PullMovesTargetInsideNonBlockingCloud()
         {

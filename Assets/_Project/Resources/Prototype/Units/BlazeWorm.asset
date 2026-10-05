@@ -24,10 +24,11 @@ MonoBehaviour:
   defense: 4
   speed: 8
   movementRange: 2
+  movementMode: 1
+  movementActionCost: 2
   periodicResistances:
   - sourceId: BURNING
     percent: 50
   abilities:
   - {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   - {fileID: 11400000, guid: b1000000000000000000000000000002, type: 2}
-  - {fileID: 11400000, guid: b1000000000000000000000000000003, type: 2}

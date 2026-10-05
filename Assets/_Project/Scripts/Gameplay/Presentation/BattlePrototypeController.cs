@@ -45,7 +45,6 @@ namespace ShardsOfTheLimit.Presentation
         private const float CellSpacing = 1.05f;
         private const float HeightStep = 0.55f;
         private const int ActionsPerTurn = 2;
-        private const int MoveActionCost = 1;
         private const float DefaultCameraZoom = 7.7f;
         private const float MinimumCameraZoom = 4.25f;
         private const float MaximumCameraZoom = 11.5f;
@@ -587,6 +586,7 @@ namespace ShardsOfTheLimit.Presentation
                 coordinate,
                 definition.Attack,
                 definition.Defense);
+            unit.ConfigureMovement(definition.MovementMode, definition.MovementActionCost);
             foreach (PeriodicResistance resistance in definition.PeriodicResistances)
                 if (!string.IsNullOrWhiteSpace(resistance.sourceId))
                     unit.SetPeriodicResistance(resistance.sourceId, resistance.percent);
@@ -740,8 +740,8 @@ namespace ShardsOfTheLimit.Presentation
             selectedDestination = coordinate;
             selectedPath = path;
             int movementCost = reachable[coordinate];
-            selectedUnit.CurrentAction = $"Path to {coordinate} ({movementCost}/{selectedUnit.MovementRange} movement)";
-            status = $"Cyan path costs {movementCost}/{selectedUnit.MovementRange} movement. Click again or confirm.";
+            selectedUnit.CurrentAction = $"Path to {coordinate} ({movementCost}/{MovementBudget(selectedUnit)} movement)";
+            status = $"Cyan path costs {movementCost}/{MovementBudget(selectedUnit)} movement. Click again or confirm.";
             RefreshHighlights();
         }
 
@@ -765,7 +765,7 @@ namespace ShardsOfTheLimit.Presentation
             selectedUnit.CurrentAction = "Ready for player input";
             RefreshMovementOptions(unit);
             status = unit.CurrentActionPoints > 0
-                ? $"Blue cells fit {unit.MovementRange} movement: uphill +1/+2 costs extra, +3 is blocked; orange cones are obstacles."
+                ? $"Blue cells fit {MovementBudget(unit)} movement: uphill +1/+2 costs extra, +3 is blocked; orange cones are obstacles."
                 : "No action points remain. End the turn with Space.";
             RefreshHighlights();
         }
@@ -825,7 +825,7 @@ namespace ShardsOfTheLimit.Presentation
 
         private IEnumerator MoveSelectedUnit(IReadOnlyList<GridCoordinate> path)
         {
-            if (!selectedUnit.SpendActionPoints(MoveActionCost))
+            if (!selectedUnit.SpendActionPoints(selectedUnit.MovementActionCost))
             {
                 status = "Not enough action points to move.";
                 yield break;
@@ -833,12 +833,12 @@ namespace ShardsOfTheLimit.Presentation
 
             isBusy = true;
             GridCoordinate start = selectedUnit.Cell;
-            int movementCost = CalculatePathMovementCost(path);
+            int movementCost = MovementRules.PathCost(grid, selectedUnit, path);
             selectedUnit.CurrentAction = "Moving";
             status = "Moving along the validated path...";
             feedback.AddLog(
                 $"{selectedUnit.DisplayName} moves {start} → {path[path.Count - 1]} " +
-                $"({movementCost}/{selectedUnit.MovementRange} movement, -{MoveActionCost} AP)");
+                $"({movementCost}/{MovementBudget(selectedUnit)} movement, -{selectedUnit.MovementActionCost} AP)");
             yield return AnimateMovement(selectedUnit, path);
 
             selectedUnit.CurrentAction = "Move complete";
@@ -862,6 +862,12 @@ namespace ShardsOfTheLimit.Presentation
 
         private IEnumerator AnimateMovement(CombatUnit unit, IReadOnlyList<GridCoordinate> path)
         {
+            if (unit.MovementMode == MovementMode.Burrow && path.Count > 1)
+            {
+                yield return AnimateBurrow(unit, path[path.Count - 1]);
+                yield break;
+            }
+
             for (int index = 1; index < path.Count; index++)
             {
                 GridCoordinate next = path[index];
@@ -875,6 +881,31 @@ namespace ShardsOfTheLimit.Presentation
 
                 unit.MoveTo(next);
             }
+        }
+
+        /// <summary>Deep Burrow: sink into the ground, travel unseen, emerge at the destination.</summary>
+        private IEnumerator AnimateBurrow(CombatUnit unit, GridCoordinate destinationCell)
+        {
+            const float depth = 1.4f;
+            const float speed = 4.5f;
+            Transform body = unitViews[unit].transform;
+            Vector3 sunk = body.position + Vector3.down * depth;
+            while ((body.position - sunk).sqrMagnitude > 0.0004f)
+            {
+                body.position = Vector3.MoveTowards(body.position, sunk, Time.deltaTime * speed);
+                yield return null;
+            }
+
+            Vector3 surface = UnitWorldPosition(destinationCell);
+            body.position = surface + Vector3.down * depth;
+            yield return new WaitForSeconds(0.15f);
+            while ((body.position - surface).sqrMagnitude > 0.0004f)
+            {
+                body.position = Vector3.MoveTowards(body.position, surface, Time.deltaTime * speed);
+                yield return null;
+            }
+
+            unit.MoveTo(destinationCell);
         }
 
         private IEnumerator AnimateForcedMovement(PushResult push)
@@ -1224,35 +1255,33 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             bool canAttack = TryPlanBestAbility(unit, out AbilityDefinition ability, out GridCoordinate abilityTarget);
-            bool seekOwnCloud = areaEffects.GetModifiers(unit).NativeMire && !areaEffects.IsInsideOwnCloud(unit,unit.Cell) &&
-                grid.BuildMovementMap(unit.Cell,unit.AvailableMovementRange,IsOccupied).ReachableCosts.Keys
-                    .Any(c => areaEffects.IsInsideOwnCloud(unit,c));
-            if ((!canAttack || seekOwnCloud) && unit.CurrentActionPoints >= MoveActionCost)
+            bool seekOwnCloud = areaEffects.GetModifiers(unit).NativeMire && !areaEffects.IsInsideAnyCloud(unit.Cell) &&
+                MovementRules.BuildMap(grid,unit,IsOccupied).ReachableCosts.Keys
+                    .Any(c => areaEffects.IsInsideAnyCloud(c));
+            if ((!canAttack || seekOwnCloud) && unit.CurrentActionPoints >= unit.MovementActionCost)
             {
-                MovementMap aiMovementMap = grid.BuildMovementMap(
-                    unit.Cell,
-                    unit.AvailableMovementRange,
-                    IsOccupied);
+                MovementMap aiMovementMap = MovementRules.BuildMap(grid, unit, IsOccupied);
+
                 IReadOnlyDictionary<GridCoordinate, int> aiReachable = aiMovementMap.ReachableCosts;
                 if (aiReachable.Count > 0)
                 {
                     GridCoordinate destination = aiReachable.Keys
-                        .OrderByDescending(coordinate => areaEffects.GetModifiers(unit).NativeMire && areaEffects.IsInsideOwnCloud(unit, coordinate))
+                        .OrderByDescending(coordinate => areaEffects.GetModifiers(unit).NativeMire && areaEffects.IsInsideAnyCloud(coordinate))
                         .ThenBy(coordinate => coordinate.ManhattanDistance(nearestTarget.Cell))
                         .ThenBy(coordinate => aiReachable[coordinate])
                         .ThenBy(coordinate => coordinate.X)
                         .ThenBy(coordinate => coordinate.Y)
                         .First();
                     IReadOnlyList<GridCoordinate> path = aiMovementMap.GetPath(destination);
-                    if (path.Count > 1 && unit.SpendActionPoints(MoveActionCost))
+                    if (path.Count > 1 && unit.SpendActionPoints(unit.MovementActionCost))
                     {
-                        int movementCost = CalculatePathMovementCost(path);
+                        int movementCost = MovementRules.PathCost(grid, selectedUnit, path);
                         unit.CurrentAction = $"Moving to {destination}";
                         selectedPath = path;
                         status = $"{unit.DisplayName} moves closer.";
                         feedback.AddLog(
                             $"{unit.DisplayName} moves {unit.Cell} → {destination} " +
-                            $"({movementCost}/{unit.MovementRange} movement, -{MoveActionCost} AP)");
+                            $"({movementCost}/{MovementBudget(unit)} movement, -{unit.MovementActionCost} AP)");
                         RefreshHighlights();
                         yield return AnimateMovement(unit, path);
                         resolvedActions++;
@@ -1432,7 +1461,7 @@ namespace ShardsOfTheLimit.Presentation
             {
                 first = GetIntentKind(ability);
             }
-            else if (enemy.CurrentActionPoints >= MoveActionCost || turns.CurrentUnit != enemy)
+            else if (enemy.CurrentActionPoints >= enemy.MovementActionCost || turns.CurrentUnit != enemy)
             {
                 first = BattleIntentKind.Movement;
                 second = PredictFollowUpIntent(enemy);
@@ -1457,7 +1486,7 @@ namespace ShardsOfTheLimit.Presentation
             if (!definitionsByUnit.TryGetValue(unit, out UnitDefinition definition)) return BattleIntentKind.None;
             IReadOnlyList<AbilityDefinition> ready = definition.Abilities
                 .Where(ability => unit.GetCooldown(ability.StableId) == 0 &&
-                                  ability.ActionCost <= Math.Max(0, ActionsPerTurn - MoveActionCost))
+                                  ability.ActionCost <= Math.Max(0, ActionsPerTurn - unit.MovementActionCost))
                 .ToArray();
             bool woundedAlly = units.Any(candidate => candidate.Team == unit.Team && !candidate.IsDefeated &&
                                                         (candidate.CurrentHealth < candidate.MaximumHealth ||
@@ -1705,34 +1734,21 @@ namespace ShardsOfTheLimit.Presentation
             return units.Any(unit => !unit.IsDefeated && unit.Cell == coordinate);
         }
 
+        private static int MovementBudget(CombatUnit unit) => unit.MovementMode == MovementMode.Burrow
+            ? unit.AvailableMovementRange * MovementRules.BurrowRangeMultiplier
+            : unit.AvailableMovementRange;
+
         private void RefreshMovementOptions(CombatUnit unit)
         {
-            if (unit != null && !unit.IsDefeated && unit.CurrentActionPoints >= MoveActionCost)
+            if (unit != null && !unit.IsDefeated && unit.CurrentActionPoints >= unit.MovementActionCost)
             {
-                movementMap = grid.BuildMovementMap(unit.Cell, unit.AvailableMovementRange, IsOccupied);
+                movementMap = MovementRules.BuildMap(grid, unit, IsOccupied);
                 reachable = movementMap.ReachableCosts;
                 return;
             }
 
             movementMap = null;
             reachable = new Dictionary<GridCoordinate, int>();
-        }
-
-        private int CalculatePathMovementCost(IReadOnlyList<GridCoordinate> path)
-        {
-            int total = 0;
-            for (int index = 1; index < path.Count; index++)
-            {
-                if (!grid.TryGetMovementCost(path[index - 1], path[index], out int stepCost))
-                {
-                    throw new InvalidOperationException(
-                        $"Validated path contains an illegal step {path[index - 1]} → {path[index]}.");
-                }
-
-                total += stepCost;
-            }
-
-            return total;
         }
 
         private Vector3 UnitWorldPosition(GridCoordinate coordinate)

@@ -12,19 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10000000000000000000000000000003, type: 3}
   m_Name: TonguePull
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
-  stableId: TonguePull
-  displayName: Tongue Pull
-  description: "BALANCE_DEFAULT \u2014 tune in Inspector. Global status duration
-    is in timeline ticks."
+  stableId: ReelingPull
+  displayName: Reeling Pull
+  description: "Melee, Pull. The first resonant on a straight line within 3 is pulled to the last free cell; 0,3 x ATK. Shared ability (toad tongue, Clamp Walker harpoon)."
   icon: {fileID: 21300000, guid: 6a9f8573facdc294fa8436f8f8e3d3d6, type: 3}
   actionCost: 1
-  cooldown: 1
+  cooldown: 2
   targetType: 1
-  targetTeam: 2
-  rangeType: 1
-  targetingPattern: {fileID: 11400000, guid: 0d63482e5817dad4f852a02114205868, type: 2}
+  targetTeam: 0
+  rangeType: 0
+  targetingPattern: {fileID: 11400000, guid: e2500000000000000000000000000025, type: 2}
   impactPattern: {fileID: 11400000, guid: 2c5d979e111ee65478cb0a3ce37b0993, type: 2}
   effects:
+  - {fileID: 11400000, guid: e2500000000000000000000000000012, type: 2}
   - {fileID: 11400000, guid: 6cd71ee20b9585f47b5c3845bb8783f8, type: 2}
   visualEffectPrefab: {fileID: 0}
   sound: {fileID: 0}

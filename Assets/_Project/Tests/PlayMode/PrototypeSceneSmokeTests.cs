@@ -36,7 +36,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RaiseGround"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/LowerGround"), Is.Not.Null);
             Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(18));
-            Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(3));
+            Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(2));
             Assert.That(blazeDefinition.Abilities.All(ability => ability.Icon != null), Is.True);
             BattlePrototypeController controller = Object.FindAnyObjectByType<BattlePrototypeController>();
             BattleFeedbackView feedback = Object.FindAnyObjectByType<BattleFeedbackView>();
@@ -142,19 +142,20 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             Assert.That(controller.ActiveUnit.MaximumHealth, Is.EqualTo(150));
             Assert.That(controller.ActiveUnit.Attack, Is.EqualTo(18));
-            Assert.That(controller.CurrentReachableCells[new GridCoordinate(0, 2)], Is.EqualTo(2));
-            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(0, 3)), Is.False,
-                "Fire Worm I has 2 movement points per move.");
-            Assert.That(controller.RequestMove(new GridCoordinate(0, 3)), Is.False);
-            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False);
-            Assert.That(controller.RequestMove(new GridCoordinate(0, 2)), Is.True);
-            float movementTimeout = Time.time + 2f;
-            while (Time.time < movementTimeout && controller.ActiveUnit.Cell != new GridCoordinate(0, 2))
+            Assert.That(controller.CurrentReachableCells[new GridCoordinate(0, 3)], Is.EqualTo(3),
+                "Deep Burrow: emerge within Movement 2 × 3 = 6 cells.");
+            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(7, 0)), Is.False, "7 cells is out of range.");
+            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(2, 4)), Is.False,
+                "Cannot emerge inside an obstacle.");
+            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False, "The Ranger occupies this cell.");
+            Assert.That(controller.RequestMove(new GridCoordinate(2, 2)), Is.True, "Height 2 does not stop a burrow.");
+            float movementTimeout = Time.time + 3f;
+            while (Time.time < movementTimeout && controller.ActiveUnit.Cell != new GridCoordinate(2, 2))
             {
                 yield return null;
             }
-            Assert.That(controller.ActiveUnit.Cell, Is.EqualTo(new GridCoordinate(0, 2)));
-            Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(1));
+            Assert.That(controller.ActiveUnit.Cell, Is.EqualTo(new GridCoordinate(2, 2)));
+            Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.Zero, "Deep Burrow spends both AP.");
 
             controller.RequestEndTurn();
             timeout = Time.time + 12f;

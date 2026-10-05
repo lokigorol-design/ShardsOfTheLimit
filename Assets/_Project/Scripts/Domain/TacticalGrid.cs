@@ -100,6 +100,45 @@ namespace ShardsOfTheLimit.Domain
         }
     }
 
+    public enum MovementMode
+    {
+        /// <summary>Step by step with climb costs.</summary>
+        Walk,
+        /// <summary>Deep Burrow: emerge in any free cell within Movement × 3, ignoring everything on the way.</summary>
+        Burrow
+    }
+
+    public static class MovementRules
+    {
+        public const int BurrowRangeMultiplier = 3;
+
+        /// <summary>The one movement preview both the player HUD and the AI use for a unit.</summary>
+        public static MovementMap BuildMap(TacticalGrid grid, CombatUnit unit, Func<GridCoordinate, bool> isOccupied)
+        {
+            if (grid == null) throw new ArgumentNullException(nameof(grid));
+            if (unit == null) throw new ArgumentNullException(nameof(unit));
+            return unit.MovementMode == MovementMode.Burrow
+                ? grid.BuildBurrowMap(unit.Cell, unit.AvailableMovementRange * BurrowRangeMultiplier, isOccupied)
+                : grid.BuildMovementMap(unit.Cell, unit.AvailableMovementRange, isOccupied);
+        }
+
+        /// <summary>Movement points a validated path spends; a burrow path costs its straight distance.</summary>
+        public static int PathCost(TacticalGrid grid, CombatUnit unit, IReadOnlyList<GridCoordinate> path)
+        {
+            if (path == null || path.Count < 2) return 0;
+            if (unit.MovementMode == MovementMode.Burrow) return path[0].ManhattanDistance(path[path.Count - 1]);
+            int total = 0;
+            for (int index = 1; index < path.Count; index++)
+            {
+                if (!grid.TryGetMovementCost(path[index - 1], path[index], out int stepCost))
+                    throw new InvalidOperationException($"Validated path contains an illegal step {path[index - 1]} → {path[index]}.");
+                total += stepCost;
+            }
+
+            return total;
+        }
+    }
+
     /// <summary>Validated square grid with four-way movement and height-aware movement costs.</summary>
     public sealed class TacticalGrid
     {
@@ -204,6 +243,35 @@ namespace ShardsOfTheLimit.Domain
             var distance = new Dictionary<GridCoordinate, int>();
             var predecessor = new Dictionary<GridCoordinate, GridCoordinate>();
             CalculateMovementCosts(start, movementRange, isOccupied, distance, predecessor);
+            return new MovementMap(start, distance, predecessor);
+        }
+
+        /// <summary>
+        /// Burrow movement (Deep Burrow, 10.2.2): any free walkable cell within <paramref name="range"/> cells
+        /// (Manhattan), ignoring height, walls and units on the way. The path is the start and the destination.
+        /// </summary>
+        public MovementMap BuildBurrowMap(
+            GridCoordinate start,
+            int range,
+            Func<GridCoordinate, bool> isOccupied = null)
+        {
+            if (range < 0) throw new ArgumentOutOfRangeException(nameof(range));
+            if (!Contains(start)) throw new ArgumentException("Start coordinate is outside the grid.", nameof(start));
+
+            var distance = new Dictionary<GridCoordinate, int> { [start] = 0 };
+            var predecessor = new Dictionary<GridCoordinate, GridCoordinate>();
+            foreach (GridCell cell in cells.Values)
+            {
+                int cost = start.ManhattanDistance(cell.Coordinate);
+                if (cost == 0 || cost > range || !cell.IsWalkable || (isOccupied?.Invoke(cell.Coordinate) ?? false))
+                {
+                    continue;
+                }
+
+                distance[cell.Coordinate] = cost;
+                predecessor[cell.Coordinate] = start;
+            }
+
             return new MovementMap(start, distance, predecessor);
         }
 

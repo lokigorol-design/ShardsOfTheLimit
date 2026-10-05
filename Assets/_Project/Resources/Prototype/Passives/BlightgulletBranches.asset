@@ -13,11 +13,10 @@ MonoBehaviour:
   m_Name: BlightgulletBranches
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
   nativeMire: 0
-  defenseBonus: 5
-  healPerActivation: 5
+  nativeMireHealPercent: 5
   toxicCocktail: 0
   cloudStacksMultiplier: 2
   cloudStacksBonus: 0
-  venomousMud: 0
+  stickyMud: 0
   modifiedAbility: {fileID: 11400000, guid: 9887fb86bb5afce44b5b3cadc8981a76, type: 2}
-  onHitCloud: {fileID: 11400000, guid: ec8135013951026449bf77f22f8fab1d, type: 2}
+  stickyMudStatus: {fileID: 11400000, guid: 9b26ef0e7c492b64993cb0f089bdb140, type: 2}

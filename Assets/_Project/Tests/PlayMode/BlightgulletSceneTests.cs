@@ -48,21 +48,27 @@ namespace ShardsOfTheLimit.Tests
             // Look abilities up by id: the slot order is authored in the Inspector and may change.
             var abilities = Resources.Load<ShardsOfTheLimit.Definitions.UnitDefinition>("Prototype/Units/Blightgullet").Abilities
                 .Select(a => a.StableId).ToList();
-            foreach (string abilityId in new[] {"PoisonCloud","CorrosionCloud","OilCloud","MudSpit","TonguePull"})
+            // Reeling Pull reaches 3 cells, so the toad first steps to (1,0); the brute at (4,0) is then in line.
+            Assert.That(controller.RequestMove(new GridCoordinate(1,0)),Is.True);
+            float moveTimeout = Time.time + 3f;
+            while (Time.time < moveTimeout && actor.Cell != new GridCoordinate(1,0)) yield return null;
+            yield return new WaitForSeconds(0.5f);
+            var cloudCenter = new GridCoordinate(2,0);
+            foreach (string abilityId in new[] {"PoisonCloud","CorrosionCloud","OilCloud","MudSpit","ReelingPull"})
             {
                 int index = abilities.IndexOf(abilityId);
                 Assert.That(index,Is.GreaterThanOrEqualTo(0),abilityId);
-                bool targetsUnit = abilityId == "MudSpit" || abilityId == "TonguePull";
+                bool targetsUnit = abilityId == "MudSpit" || abilityId == "ReelingPull";
                 actor.BeginActivation(2);
                 Call(controller,"BeginAbilityTargeting",index);
-                Call(controller,"HandleCellChoice",targetsUnit ? target.Cell : new GridCoordinate(1,0));
+                Call(controller,"HandleCellChoice",targetsUnit ? target.Cell : cloudCenter);
                 Call(controller,"ConfirmCurrentChoice");
                 yield return new WaitForSeconds(2f);
                 Assert.That(actor.CurrentActionPoints,Is.EqualTo(1),$"{abilityId} must spend exactly one AP.");
             }
             Assert.That(controller.AreaEffects.Clouds.Count,Is.EqualTo(3));
-            Assert.That(target.IsImmobilized,Is.True);
-            Assert.That(target.Cell,Is.EqualTo(new GridCoordinate(1,0)));
+            Assert.That(target.GetMechanicStacks(StatusMechanic.Slow),Is.EqualTo(1),"Mud Spit slows (design 2.5).");
+            Assert.That(target.Cell,Is.EqualTo(cloudCenter),"Pulled to the last free cell next to the toad.");
             Assert.That(controller.AreaEffects.Clouds.All(c => c.OwnerId == actor.Id),Is.True);
             var cloudRoot = GameObject.Find("Area Effects (non-blocking)");
             Assert.That(cloudRoot.GetComponentsInChildren<Collider>(),Is.Empty);

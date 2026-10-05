@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ShardsOfTheLimit.Domain;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -31,6 +32,9 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField, Min(1), Tooltip("Turn interval = 1000 / Speed ticks (30..200). Speed 10 = every 100 ticks.")]
         [FormerlySerializedAs("initiative")] private int speed = 10;
         [SerializeField, Min(0)] private int movementRange = 3;
+        [SerializeField, Tooltip("Walk, or Burrow (Deep Burrow: emerge within Movement × 3 cells).")]
+        private MovementMode movementMode = MovementMode.Walk;
+        [SerializeField, Min(1), Tooltip("AP one move costs; Deep Burrow costs 2.")] private int movementActionCost = 1;
         [SerializeField, Tooltip("\"Защита от периодического урона\" per source, e.g. BURNING 50.")]
         private List<PeriodicResistance> periodicResistances = new List<PeriodicResistance>();
         [SerializeField] private List<AbilityDefinition> abilities = new List<AbilityDefinition>();
@@ -49,6 +53,8 @@ namespace ShardsOfTheLimit.Definitions
         public int Defense => defense;
         public int Speed => speed;
         public int MovementRange => movementRange;
+        public MovementMode MovementMode => movementMode;
+        public int MovementActionCost => Mathf.Max(1, movementActionCost);
         public IReadOnlyList<PeriodicResistance> PeriodicResistances => periodicResistances != null
             ? periodicResistances
             : (IReadOnlyList<PeriodicResistance>)Array.Empty<PeriodicResistance>();

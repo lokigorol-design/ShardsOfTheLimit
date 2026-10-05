@@ -88,6 +88,13 @@ namespace ShardsOfTheLimit.Runtime
                 return geometricTargets;
             }
 
+            if (ability.TargetingPattern is LinePatternDefinition line && line.StopAtFirstUnit)
+            {
+                // Only the first resonant on each line is reachable; friendly units block the line too.
+                geometricTargets = line.FirstOccupiedCells(grid, source.Cell, cell =>
+                    battleUnits.Any(unit => unit != source && !unit.IsDefeated && unit.Cell == cell));
+            }
+
             var geometricSet = new HashSet<GridCoordinate>(geometricTargets);
             return battleUnits
                 .Where(unit => !unit.IsDefeated)
@@ -231,10 +238,11 @@ namespace ShardsOfTheLimit.Runtime
                     ICombatEffectResult result;
                     if (effect is ApplyStatusEffectDefinition statusEffect)
                     {
-                        forecastStatuses[target].TryGetValue(statusEffect.status.stableId, out var previous);
-                        var statusResult = StatusCalculator.Apply(target, statusEffect.status.Snapshot(), statusEffect.stacks,
+                        StatusDefinition status = ResolveStatus(statusEffect.status, ability, modifiers);
+                        forecastStatuses[target].TryGetValue(status.stableId, out var previous);
+                        var statusResult = StatusCalculator.Apply(target, status.Snapshot(), statusEffect.stacks,
                             timelineTick, source.Id, previous);
-                        forecastStatuses[target][statusEffect.status.stableId] = statusResult.State;
+                        forecastStatuses[target][status.stableId] = statusResult.State;
                         result = statusResult;
                     }
                     else result = Calculate(
@@ -275,10 +283,6 @@ namespace ShardsOfTheLimit.Runtime
                 }
             }
 
-            if (modifiers != null && modifiers.venomousMud && modifiers.modifiedAbility == ability &&
-                modifiers.onHitCloud != null && results.OfType<DamageResult>().Any(r => r.HealthDelta < 0 || r.ShieldDelta < 0))
-                clouds.Add(PreviewCloud(modifiers.onHitCloud, areas, grid, source, ability, selectedTarget, timelineTick));
-
             if (apply)
             {
                 if (clouds.Count > 0 && areas == null) throw new InvalidOperationException("Cloud execution requires battle AreaEffectWorld.");
@@ -299,6 +303,18 @@ namespace ShardsOfTheLimit.Runtime
             var world = areas ?? new AreaEffectWorld(grid, new[] { source });
             return world.PreviewCloud(source, ability.StableId, definition.Snapshot(), definition.areaShape.Evaluate(grid, target),
                 CloudAreaEffect.DirectionFrom(source.Cell, target), grid.GetCell(target).Height, tick);
+        }
+
+        /// <summary>Sticky Mud: the modified ability applies its replacement status instead of Slow.</summary>
+        private static StatusDefinition ResolveStatus(
+            StatusDefinition status,
+            AbilityDefinition ability,
+            PassiveModifierDefinition modifiers)
+        {
+            return modifiers != null && modifiers.stickyMud && modifiers.modifiedAbility == ability &&
+                   modifiers.stickyMudStatus != null && status.mechanic == StatusMechanic.Slow
+                ? modifiers.stickyMudStatus
+                : status;
         }
 
         private static int CountOil(IReadOnlyDictionary<string, StackStatusState> statuses) =>

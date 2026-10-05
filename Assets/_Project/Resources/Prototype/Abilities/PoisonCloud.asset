@@ -14,15 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: PoisonCloud
   displayName: Poison Cloud
-  description: "BALANCE_DEFAULT \u2014 tune in Inspector. Global status duration
-    is in timeline ticks."
+  description: "Cloud, range 2, cross of 5. 1 Poison stack every 100 ticks, lives 3 turns."
   icon: {fileID: 21300000, guid: 2d4c8aa7036c0eb48a840135548a9e6a, type: 3}
   actionCost: 1
-  cooldown: 1
+  cooldown: 2
   targetType: 0
   targetTeam: 0
   rangeType: 1
-  targetingPattern: {fileID: 11400000, guid: 0d63482e5817dad4f852a02114205868, type: 2}
+  targetingPattern: {fileID: 11400000, guid: e2500000000000000000000000000020, type: 2}
   impactPattern: {fileID: 11400000, guid: d216c34f26d4fea42a07c69ccbaa38fb, type: 2}
   effects:
   - {fileID: 11400000, guid: 706137118de996f47836933d321d0015, type: 2}

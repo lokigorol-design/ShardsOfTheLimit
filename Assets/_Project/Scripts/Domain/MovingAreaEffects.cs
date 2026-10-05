@@ -78,12 +78,12 @@ namespace ShardsOfTheLimit.Domain
     {
         public float CloudStacksMultiplier { get; }
         public int CloudStacksBonus { get; }
+        /// <summary>Native Mire (2.5): immune to negative effects of any cloud; heals at turn start while inside one.</summary>
         public bool NativeMire { get; }
-        public int DefenseBonus { get; }
-        public int HealPerActivation { get; }
-        public PassiveModifiers(float multiplier = 1, int bonus = 0, bool nativeMire = false, int defense = 0, int heal = 0)
+        public int HealPercentPerActivation { get; }
+        public PassiveModifiers(float multiplier = 1, int bonus = 0, bool nativeMire = false, int healPercent = 0)
         { CloudStacksMultiplier = Math.Max(0, multiplier); CloudStacksBonus = bonus; NativeMire = nativeMire;
-          DefenseBonus = Math.Max(0, defense); HealPerActivation = Math.Max(0, heal); }
+          HealPercentPerActivation = Math.Max(0, healPercent); }
         public int ApplyStacks(int amount) => Math.Max(1, (int)Math.Ceiling(amount * CloudStacksMultiplier) + CloudStacksBonus);
     }
 
@@ -96,13 +96,11 @@ namespace ShardsOfTheLimit.Domain
         private readonly Dictionary<CombatUnit, PassiveModifiers> passives = new Dictionary<CombatUnit, PassiveModifiers>();
         public IReadOnlyList<CloudAreaEffect> Clouds => clouds;
         public AreaEffectWorld(TacticalGrid grid, IReadOnlyList<CombatUnit> units) { this.grid = grid; this.units = units; }
-        public void Register(CombatUnit unit, PassiveModifiers modifiers)
-        {
-            passives[unit] = modifiers;
-            unit.DefenseProvider = () => modifiers.NativeMire && IsInsideOwnCloud(unit, unit.Cell) ? modifiers.DefenseBonus : 0;
-        }
+        public void Register(CombatUnit unit, PassiveModifiers modifiers) => passives[unit] = modifiers;
         public PassiveModifiers GetModifiers(CombatUnit unit) => passives.TryGetValue(unit, out var value) ? value : new PassiveModifiers();
         public bool IsInsideOwnCloud(CombatUnit unit, GridCoordinate cell) => clouds.Any(c => c.OwnerId == unit.Id && c.Contains(grid, cell));
+        public bool IsInsideAnyCloud(GridCoordinate cell) => clouds.Any(c => c.Contains(grid, cell));
+        public bool IsImmuneToClouds(CombatUnit unit) => GetModifiers(unit).NativeMire;
         public CloudAreaEffect PreviewCloud(CombatUnit owner, string abilityId, CloudRules rules,
             IEnumerable<GridCoordinate> cells, GridCoordinate direction, float height, long tick)
             => new CloudAreaEffect(owner, abilityId, rules,
@@ -132,7 +130,7 @@ namespace ShardsOfTheLimit.Domain
             {
                 if (cloud.NextPulseTick == tick)
                 {
-                    foreach (var unit in units.Where(u => !u.IsDefeated && cloud.Contains(grid, u.Cell)))
+                    foreach (var unit in units.Where(u => !u.IsDefeated && !IsImmuneToClouds(u) && cloud.Contains(grid, u.Cell)))
                     {
                         unit.Statuses.TryGetValue(cloud.Rules.Status.Id, out var previous);
                         var status = StatusCalculator.Apply(unit, cloud.Rules.Status, cloud.StacksPerTick, tick, cloud.OwnerId, previous);
@@ -153,8 +151,9 @@ namespace ShardsOfTheLimit.Domain
         public IReadOnlyList<ICombatEffectResult> OnActivation(CombatUnit unit)
         {
             var modifier = GetModifiers(unit);
-            if (!modifier.NativeMire || !IsInsideOwnCloud(unit, unit.Cell) || unit.IsDefeated) return Array.Empty<ICombatEffectResult>();
-            var heal = CombatEffectCalculator.Heal(unit, unit.ResourceState, modifier.HealPerActivation);
+            if (!modifier.NativeMire || !IsInsideAnyCloud(unit.Cell) || unit.IsDefeated) return Array.Empty<ICombatEffectResult>();
+            int amount = (int)Math.Ceiling(unit.MaximumHealth * modifier.HealPercentPerActivation / 100d);
+            var heal = CombatEffectCalculator.Heal(unit, unit.ResourceState, amount);
             CombatEffectResolver.Apply(new[] { heal });
             return new ICombatEffectResult[] { heal };
         }

@@ -87,7 +87,7 @@ public static class BlightgulletContentSetup
         var tongue = Ability("TonguePull", "Tongue Pull", range, single, 1, true, pull);
         var oilAbility = Ability("OilCloud", "Oil Cloud", range, cross, 1, false, oe);
         var passive = Asset<PassiveModifierDefinition>("Passives/BlightgulletBranches", p =>
-        { p.modifiedAbility = mud; p.onHitCloud = small; });
+        { p.modifiedAbility = mud; p.stickyMudStatus = immobilized; });
         Asset<UnitDefinition>("Units/Blightgullet", u =>
         {
             Set(u,"stableId","blightgullet"); Set(u,"displayName","Blightgullet");

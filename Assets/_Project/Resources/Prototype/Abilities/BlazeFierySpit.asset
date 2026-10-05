@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: BlazeFierySpit
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: blaze-fiery-spit
-  displayName: Fiery spit
-  description: A ranged fire projectile. Deals 20 damage and applies Burn for 3 turns at 10 percent of this ability damage per turn.
+  displayName: Fire Spit
+  description: Ranged, one target within 4. 0,5 x ATK and Burning (0,25 x ATK every 100 ticks, 3 turns).
   icon: {fileID: 21300000, guid: 60000000000000000000000000000012, type: 3}
   actionCost: 1
-  cooldown: 0
+  cooldown: 1
   targetType: 0
   targetTeam: 2
   rangeType: 1
-  targetingPattern: {fileID: 11400000, guid: a3333333333333333333333333333333, type: 2}
+  targetingPattern: {fileID: 11400000, guid: e2500000000000000000000000000026, type: 2}
   impactPattern: {fileID: 11400000, guid: a5555555555555555555555555555555, type: 2}
   effects:
   - {fileID: 11400000, guid: c1000000000000000000000000000002, type: 2}

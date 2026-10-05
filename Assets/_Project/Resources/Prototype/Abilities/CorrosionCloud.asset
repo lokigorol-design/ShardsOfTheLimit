@@ -14,16 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: CorrosionCloud
   displayName: Corrosion Cloud
-  description: "BALANCE_DEFAULT \u2014 tune in Inspector. Global status duration
-    is in timeline ticks."
+  description: "Cloud, range 3, diamond of 13. 1 Corrosion stack every 100 ticks, lives 3 turns."
   icon: {fileID: 21300000, guid: 84612f29ef6869447bd787ecdb9f1a6f, type: 3}
   actionCost: 1
-  cooldown: 1
+  cooldown: 4
   targetType: 0
   targetTeam: 0
   rangeType: 1
-  targetingPattern: {fileID: 11400000, guid: 0d63482e5817dad4f852a02114205868, type: 2}
-  impactPattern: {fileID: 11400000, guid: d216c34f26d4fea42a07c69ccbaa38fb, type: 2}
+  targetingPattern: {fileID: 11400000, guid: e2500000000000000000000000000021, type: 2}
+  impactPattern: {fileID: 11400000, guid: e2500000000000000000000000000022, type: 2}
   effects:
   - {fileID: 11400000, guid: 3c2ae809238dcf243abdeca9ca37e20c, type: 2}
   visualEffectPrefab: {fileID: 0}

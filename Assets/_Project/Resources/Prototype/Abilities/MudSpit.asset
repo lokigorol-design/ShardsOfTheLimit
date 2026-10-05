@@ -14,8 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: MudSpit
   displayName: Mud Spit
-  description: "BALANCE_DEFAULT \u2014 tune in Inspector. Global status duration
-    is in timeline ticks."
+  description: "0,8 x ATK and Slow (design 2.5, 10.10.2). Sticky Mud swaps Slow for 1-turn Immobilize."
   icon: {fileID: 21300000, guid: f4fa2a340a331044da11b5798ce316b5, type: 3}
   actionCost: 1
   cooldown: 1
@@ -26,7 +25,7 @@ MonoBehaviour:
   impactPattern: {fileID: 11400000, guid: 2c5d979e111ee65478cb0a3ce37b0993, type: 2}
   effects:
   - {fileID: 11400000, guid: 8b0ef8be7c619a340803ba12c2cfd9e5, type: 2}
-  - {fileID: 11400000, guid: 922067de52ff09c468da163d770f23a8, type: 2}
+  - {fileID: 11400000, guid: e2500000000000000000000000000011, type: 2}
   visualEffectPrefab: {fileID: 0}
   sound: {fileID: 0}
   animationKey: 

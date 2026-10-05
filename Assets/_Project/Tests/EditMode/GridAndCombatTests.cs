@@ -337,6 +337,46 @@ namespace ShardsOfTheLimit.Tests
         }
 
         [Test]
+        public void DeepBurrowReachesFreeCellsWithinTripleMovementIgnoringTerrain()
+        {
+            var cells = new List<GridCell>();
+            for (int x = 0; x < 11; x++)
+                cells.Add(new GridCell(new GridCoordinate(x, 0), x == 1 ? 3 : 0, x != 2));
+            var grid = new TacticalGrid(cells);
+            CombatUnit worm = CreateUnit(new GridCoordinate(0, 0));
+            worm.ConfigureMovement(MovementMode.Burrow, 2);
+            var occupied = new GridCoordinate(4, 0);
+
+            MovementMap map = MovementRules.BuildMap(grid, worm, cell => cell == occupied);
+            Assert.That(map.ReachableCosts.ContainsKey(new GridCoordinate(3, 0)), Is.True,
+                "Burrow passes under a height-3 wall and an obstacle.");
+            Assert.That(map.ReachableCosts.ContainsKey(new GridCoordinate(2, 0)), Is.False, "Cannot emerge in an obstacle.");
+            Assert.That(map.ReachableCosts.ContainsKey(occupied), Is.False, "Cannot emerge in an occupied cell.");
+            Assert.That(map.ReachableCosts.ContainsKey(new GridCoordinate(9, 0)), Is.True, "Movement 3 × 3 = 9 cells.");
+            Assert.That(map.ReachableCosts.ContainsKey(new GridCoordinate(10, 0)), Is.False);
+            Assert.That(map.GetPath(new GridCoordinate(3, 0)).Count, Is.EqualTo(2));
+            Assert.That(MovementRules.PathCost(grid, worm, map.GetPath(new GridCoordinate(3, 0))), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void LongBiteHitsOnlyTheFirstResonantOnItsLine()
+        {
+            AbilityDefinition bite = Resources.Load<AbilityDefinition>("Prototype/Abilities/BlazeLongBite");
+            TacticalGrid grid = CreateGrid(5, 5);
+            CombatUnit worm = CreateUnit(new GridCoordinate(0, 2), team: Team.Player, attack: 18);
+            CombatUnit ally = CreateUnit(new GridCoordinate(1, 2), maximumHealth: 100, team: Team.Player);
+            CombatUnit enemyBehind = CreateUnit(new GridCoordinate(2, 2), maximumHealth: 100);
+            CombatUnit enemyAbove = CreateUnit(new GridCoordinate(0, 4), maximumHealth: 100);
+            CombatUnit[] units = { worm, ally, enemyBehind, enemyAbove };
+
+            IReadOnlyCollection<GridCoordinate> targets = AbilityRuntime.GetTargetableCells(bite, grid, worm, units);
+            CollectionAssert.AreEquivalent(new[] { ally.Cell, enemyAbove.Cell }, targets.ToArray(),
+                "Friendly fire: the ally in front is the first target; the enemy behind it is covered.");
+            AbilityRuntime.Execute(bite, grid, worm, enemyAbove.Cell, units);
+            Assert.That(enemyAbove.CurrentHealth, Is.EqualTo(80), "1,1 × ATK 18 = 19.8 → 20.");
+        }
+
+        [Test]
         public void PushStoppedByMapEdgeIsNotACollision()
         {
             var grid = CreateGrid(3, 1);
@@ -893,7 +933,9 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blaze.MovementRange, Is.EqualTo(2));
             Assert.That(blaze.PeriodicResistances.Single().sourceId, Is.EqualTo("BURNING"));
             Assert.That(blaze.PeriodicResistances.Single().percent, Is.EqualTo(50));
-            Assert.That(blaze.Abilities.Count, Is.EqualTo(3));
+            Assert.That(blaze.Abilities.Count, Is.EqualTo(2), "Fire Worm I: Long Bite and Fire Spit; Deep Burrow is its movement.");
+            Assert.That(blaze.MovementMode, Is.EqualTo(MovementMode.Burrow));
+            Assert.That(blaze.MovementActionCost, Is.EqualTo(2));
             Assert.That(blaze.Abilities.All(ability => ability.Icon != null), Is.True);
             Assert.That(blaze.Portrait, Is.Not.Null);
             Assert.That(blaze.VisualPrefab, Is.Not.Null);
@@ -908,8 +950,8 @@ namespace ShardsOfTheLimit.Tests
                 Resources.Load<ApplyBurnEffectDefinition>("Prototype/Effects/ApplyBurnTenPercent");
             Assert.That(burnDefinition, Is.Not.Null);
             Assert.That(burnDefinition.Icon, Is.Not.Null);
-            Assert.That(spit.Cooldown, Is.Zero);
-            Assert.That(volley.Cooldown, Is.EqualTo(2));
+            Assert.That(spit.Cooldown, Is.EqualTo(1));
+            Assert.That(volley.Cooldown, Is.EqualTo(2), "Fiery Volley stays as a library ability outside the worm roster.");
 
             TacticalGrid grid = CreateGrid(7, 7);
             CombatUnit source = CreateUnit(new GridCoordinate(1, 1), team: Team.Player);

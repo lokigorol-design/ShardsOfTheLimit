@@ -135,6 +135,17 @@ namespace ShardsOfTheLimit.Domain
 
         public void MoveTo(GridCoordinate cell) => Cell = cell;
 
+        public MovementMode MovementMode { get; private set; } = MovementMode.Walk;
+        /// <summary>AP one move costs: 1 by default, 2 for Deep Burrow.</summary>
+        public int MovementActionCost { get; private set; } = 1;
+
+        public void ConfigureMovement(MovementMode mode, int actionCost)
+        {
+            if (actionCost < 1) throw new ArgumentOutOfRangeException(nameof(actionCost));
+            MovementMode = mode;
+            MovementActionCost = actionCost;
+        }
+
         /// <summary>Authored "Защита от периодического урона" for one source, in percent.</summary>
         public void SetPeriodicResistance(string sourceId, int percent)
         {

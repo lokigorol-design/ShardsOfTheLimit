@@ -11,6 +11,13 @@ namespace ShardsOfTheLimit.Definitions
         Direction
     }
 
+    public enum AbilityTargetTeam
+    {
+        Any,
+        Allies,
+        Enemies
+    }
+
     public abstract class PatternDefinition : ScriptableObject
     {
         public abstract IReadOnlyCollection<GridCoordinate> Evaluate(

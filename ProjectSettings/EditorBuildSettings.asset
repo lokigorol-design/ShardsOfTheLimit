@@ -8,4 +8,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/PrototypeBattle.unity
     guid: 62b7a229e43e46a5b864621a43cf6a91
+  - enabled: 1
+    path: Assets/_Project/Scenes/BlightgulletBattle.unity
+    guid: ecfd42cc61f0a364b8f7a8583fa11a39
   m_configObjects: {}

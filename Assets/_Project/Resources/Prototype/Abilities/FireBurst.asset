@@ -14,11 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: fire-burst
   displayName: Fire Burst
-  description: Select a cell at range 4 and damage the center plus orthogonal neighbors.
+  description: Select a cell at range 4 and damage every unit in the center plus orthogonal neighbors.
   icon: {fileID: 0}
   actionCost: 1
   cooldown: 1
   targetType: 0
+  targetTeam: 2
+  rangeType: 1
   targetingPattern: {fileID: 11400000, guid: 20000000000000000000000000000001, type: 2}
   impactPattern: {fileID: 11400000, guid: 20000000000000000000000000000002, type: 2}
   effects:

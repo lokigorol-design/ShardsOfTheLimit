@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000003, type: 3}
+  m_Name: AegisField
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
+  stableId: aegis-field
+  displayName: Aegis Field
+  description: Restore up to 5 shield to one allied unit within range 3.
+  icon: {fileID: 0}
+  actionCost: 1
+  cooldown: 2
+  targetType: 1
+  targetTeam: 1
+  rangeType: 1
+  targetingPattern: {fileID: 11400000, guid: a6666666666666666666666666666666, type: 2}
+  impactPattern: {fileID: 11400000, guid: a5555555555555555555555555555555, type: 2}
+  effects:
+  - {fileID: 11400000, guid: c6666666666666666666666666666666, type: 2}
+  visualEffectPrefab: {fileID: 0}
+  sound: {fileID: 0}
+  animationKey: 

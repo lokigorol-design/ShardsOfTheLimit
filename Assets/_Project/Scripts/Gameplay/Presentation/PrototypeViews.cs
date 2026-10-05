@@ -27,11 +27,18 @@ namespace ShardsOfTheLimit.Presentation
 
             cachedRenderer.material.color = color;
         }
+
+        public void SetBaseColor(Color color)
+        {
+            BaseColor = color;
+            SetColor(color);
+        }
     }
 
     public sealed class CombatUnitView : MonoBehaviour
     {
-        private Renderer cachedRenderer;
+        private Renderer[] cachedRenderers;
+        private Color[] baseColors;
 
         public CombatUnit Unit { get; private set; }
         public Color BaseColor { get; private set; }
@@ -40,10 +47,39 @@ namespace ShardsOfTheLimit.Presentation
         {
             Unit = unit;
             BaseColor = color;
-            cachedRenderer = GetComponent<Renderer>();
-            cachedRenderer.material.color = color;
+            cachedRenderers = GetComponentsInChildren<Renderer>();
+            baseColors = new Color[cachedRenderers.Length];
+            for (int index = 0; index < cachedRenderers.Length; index++)
+            {
+                baseColors[index] = cachedRenderers[index].material.color;
+            }
         }
 
-        public void SetColor(Color color) => cachedRenderer.material.color = color;
+        public void SetHitFlash(float strength)
+        {
+            float clamped = Mathf.Clamp01(strength);
+            for (int index = 0; index < cachedRenderers.Length; index++)
+            {
+                cachedRenderers[index].material.color = Color.Lerp(baseColors[index], Color.white, clamped);
+            }
+        }
+
+        public void RestoreColors()
+        {
+            for (int index = 0; index < cachedRenderers.Length; index++)
+            {
+                cachedRenderers[index].material.color = baseColors[index];
+            }
+        }
+    }
+
+    public sealed class ObstacleView : MonoBehaviour
+    {
+        public GridCoordinate Coordinate { get; private set; }
+
+        public void Initialize(GridCoordinate coordinate)
+        {
+            Coordinate = coordinate;
+        }
     }
 }

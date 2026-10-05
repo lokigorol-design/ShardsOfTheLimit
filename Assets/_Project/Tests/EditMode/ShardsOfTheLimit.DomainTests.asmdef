@@ -2,7 +2,8 @@
   "name": "ShardsOfTheLimit.DomainTests",
   "rootNamespace": "ShardsOfTheLimit.Tests",
   "references": [
-    "ShardsOfTheLimit.Domain"
+    "ShardsOfTheLimit.Domain",
+    "ShardsOfTheLimit.Gameplay"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

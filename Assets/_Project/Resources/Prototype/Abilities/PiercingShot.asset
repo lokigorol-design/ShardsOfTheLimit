@@ -19,6 +19,8 @@ MonoBehaviour:
   actionCost: 1
   cooldown: 1
   targetType: 0
+  targetTeam: 2
+  rangeType: 1
   targetingPattern: {fileID: 11400000, guid: a4444444444444444444444444444444, type: 2}
   impactPattern: {fileID: 11400000, guid: a5555555555555555555555555555555, type: 2}
   effects:

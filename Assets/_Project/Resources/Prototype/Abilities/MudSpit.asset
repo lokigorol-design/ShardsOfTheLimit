@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000003, type: 3}
+  m_Name: MudSpit
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
+  stableId: MudSpit
+  displayName: Mud Spit
+  description: "BALANCE_DEFAULT \u2014 tune in Inspector. Global status duration
+    is in timeline ticks."
+  icon: {fileID: 21300000, guid: f4fa2a340a331044da11b5798ce316b5, type: 3}
+  actionCost: 1
+  cooldown: 1
+  targetType: 1
+  targetTeam: 2
+  rangeType: 1
+  targetingPattern: {fileID: 11400000, guid: 0d63482e5817dad4f852a02114205868, type: 2}
+  impactPattern: {fileID: 11400000, guid: 2c5d979e111ee65478cb0a3ce37b0993, type: 2}
+  effects:
+  - {fileID: 11400000, guid: 8b0ef8be7c619a340803ba12c2cfd9e5, type: 2}
+  - {fileID: 11400000, guid: 922067de52ff09c468da163d770f23a8, type: 2}
+  visualEffectPrefab: {fileID: 0}
+  sound: {fileID: 0}
+  animationKey: 

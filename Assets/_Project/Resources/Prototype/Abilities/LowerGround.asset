@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000003, type: 3}
+  m_Name: LowerGround
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
+  stableId: lower-ground
+  displayName: Lower Ground
+  description: Lower one walkable cell by 1 height level, including the caster's own cell, down to height -4.
+  icon: {fileID: 0}
+  actionCost: 1
+  cooldown: 2
+  targetType: 0
+  targetTeam: 0
+  rangeType: 1
+  targetingPattern: {fileID: 11400000, guid: a7777777777777777777777777777777, type: 2}
+  impactPattern: {fileID: 11400000, guid: a5555555555555555555555555555555, type: 2}
+  effects:
+  - {fileID: 11400000, guid: c9999999999999999999999999999999, type: 2}
+  visualEffectPrefab: {fileID: 0}
+  sound: {fileID: 0}
+  animationKey: 

@@ -5,6 +5,14 @@ using UnityEngine;
 
 namespace ShardsOfTheLimit.Presentation
 {
+    public enum AbilityVisualKind
+    {
+        Attack,
+        Healing,
+        Shield,
+        Special
+    }
+
     /// <summary>Temporary combat readability: log, banners, projectile, impacts and damage reactions.</summary>
     public sealed class BattleFeedbackView : MonoBehaviour
     {
@@ -63,9 +71,34 @@ namespace ShardsOfTheLimit.Presentation
         public IEnumerator PlayAbility(
             Vector3 sourcePosition,
             Vector3 targetPosition,
-            IReadOnlyList<Vector3> impactPositions)
+            IReadOnlyList<Vector3> impactPositions,
+            Color effectColor,
+            AbilityVisualKind visualKind)
         {
-            GameObject projectile = CreateMarker("Ability Projectile", PrimitiveType.Sphere, new Color(1f, 0.42f, 0.08f));
+            switch (visualKind)
+            {
+                case AbilityVisualKind.Healing:
+                    yield return PlayHealing(impactPositions, effectColor);
+                    break;
+                case AbilityVisualKind.Shield:
+                    yield return PlayShield(impactPositions, effectColor);
+                    break;
+                case AbilityVisualKind.Special:
+                    yield return PlaySpecial(sourcePosition, targetPosition, impactPositions, effectColor);
+                    break;
+                default:
+                    yield return PlayAttack(sourcePosition, targetPosition, impactPositions, effectColor);
+                    break;
+            }
+        }
+
+        private static IEnumerator PlayAttack(
+            Vector3 sourcePosition,
+            Vector3 targetPosition,
+            IReadOnlyList<Vector3> impactPositions,
+            Color effectColor)
+        {
+            GameObject projectile = CreateMarker("Ability Projectile", PrimitiveType.Sphere, effectColor);
             projectile.transform.localScale = Vector3.one * 0.22f;
             float elapsed = 0f;
             const float travelDuration = 0.42f;
@@ -80,7 +113,7 @@ namespace ShardsOfTheLimit.Presentation
 
             Destroy(projectile);
             List<GameObject> impacts = impactPositions
-                .Select(position => CreateMarker("Impact Pulse", PrimitiveType.Sphere, new Color(1f, 0.2f, 0.04f)))
+                .Select(position => CreateMarker("Impact Pulse", PrimitiveType.Sphere, effectColor))
                 .ToList();
             for (int index = 0; index < impacts.Count; index++)
             {
@@ -105,6 +138,116 @@ namespace ShardsOfTheLimit.Presentation
             foreach (GameObject impact in impacts) Destroy(impact);
         }
 
+        private static IEnumerator PlayHealing(IReadOnlyList<Vector3> impactPositions, Color effectColor)
+        {
+            var motes = new List<GameObject>();
+            foreach (Vector3 position in impactPositions)
+            {
+                for (int index = 0; index < 3; index++)
+                {
+                    GameObject mote = CreateMarker("Healing Mote", PrimitiveType.Sphere, effectColor);
+                    float angle = index * Mathf.PI * 2f / 3f;
+                    mote.transform.position = position + new Vector3(Mathf.Cos(angle), 0.12f, Mathf.Sin(angle)) * 0.28f;
+                    mote.transform.localScale = Vector3.one * 0.12f;
+                    motes.Add(mote);
+                }
+            }
+
+            float elapsed = 0f;
+            const float duration = 0.58f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / duration);
+                for (int index = 0; index < motes.Count; index++)
+                {
+                    motes[index].transform.position += Vector3.up * Time.unscaledDeltaTime * 0.9f;
+                    float size = Mathf.Max(0.01f, Mathf.Sin(progress * Mathf.PI) * 0.18f);
+                    motes[index].transform.localScale = Vector3.one * size;
+                }
+
+                yield return null;
+            }
+
+            foreach (GameObject mote in motes) Destroy(mote);
+        }
+
+        private static IEnumerator PlayShield(IReadOnlyList<Vector3> impactPositions, Color effectColor)
+        {
+            List<GameObject> shells = impactPositions.Select(position =>
+            {
+                GameObject shell = CreateMarker("Shield Shell", PrimitiveType.Sphere, effectColor);
+                shell.transform.position = position + Vector3.up * 0.48f;
+                shell.transform.localScale = Vector3.one * 0.08f;
+                return shell;
+            }).ToList();
+
+            float elapsed = 0f;
+            const float duration = 0.52f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / duration);
+                float size = 0.08f + Mathf.Sin(progress * Mathf.PI) * 0.86f;
+                foreach (GameObject shell in shells)
+                {
+                    shell.transform.localScale = Vector3.one * size;
+                }
+
+                yield return null;
+            }
+
+            foreach (GameObject shell in shells) Destroy(shell);
+        }
+
+        private static IEnumerator PlaySpecial(
+            Vector3 sourcePosition,
+            Vector3 targetPosition,
+            IReadOnlyList<Vector3> impactPositions,
+            Color effectColor)
+        {
+            GameObject core = CreateMarker("Special Core", PrimitiveType.Cube, effectColor);
+            core.transform.position = sourcePosition;
+            core.transform.localScale = Vector3.one * 0.18f;
+            float elapsed = 0f;
+            const float travelDuration = 0.34f;
+            while (elapsed < travelDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / travelDuration);
+                core.transform.position = Vector3.Lerp(sourcePosition, targetPosition, progress) +
+                                          Vector3.up * Mathf.Sin(progress * Mathf.PI) * 0.38f;
+                core.transform.Rotate(Vector3.one, Time.unscaledDeltaTime * 420f, Space.World);
+                yield return null;
+            }
+
+            Destroy(core);
+            List<GameObject> pillars = impactPositions.Select(position =>
+            {
+                GameObject pillar = CreateMarker("Special Pillar", PrimitiveType.Cube, effectColor);
+                pillar.transform.position = position;
+                pillar.transform.localScale = new Vector3(0.16f, 0.02f, 0.16f);
+                return pillar;
+            }).ToList();
+            elapsed = 0f;
+            const float pulseDuration = 0.46f;
+            while (elapsed < pulseDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(elapsed / pulseDuration);
+                float height = Mathf.Sin(progress * Mathf.PI) * 0.9f;
+                foreach (GameObject pillar in pillars)
+                {
+                    pillar.transform.localScale = new Vector3(0.16f, Mathf.Max(0.02f, height), 0.16f);
+                    pillar.transform.Rotate(Vector3.up, Time.unscaledDeltaTime * 180f, Space.World);
+                }
+
+                yield return null;
+            }
+
+            foreach (GameObject pillar in pillars) Destroy(pillar);
+        }
+
         public IEnumerator PlayHitReactions(IReadOnlyList<CombatUnitView> targets)
         {
             if (targets.Count == 0) yield break;
@@ -119,7 +262,7 @@ namespace ShardsOfTheLimit.Presentation
                 float kick = Mathf.Sin(progress * Mathf.PI * 4f) * (1f - progress) * 0.08f;
                 for (int index = 0; index < targets.Count; index++)
                 {
-                    targets[index].SetColor(Color.Lerp(Color.white, targets[index].BaseColor, progress));
+                    targets[index].SetHitFlash(1f - progress);
                     targets[index].transform.position = origins[index] + Vector3.right * kick;
                 }
 
@@ -128,7 +271,7 @@ namespace ShardsOfTheLimit.Presentation
 
             for (int index = 0; index < targets.Count; index++)
             {
-                targets[index].SetColor(targets[index].BaseColor);
+                targets[index].RestoreColors();
                 targets[index].transform.position = origins[index];
             }
         }

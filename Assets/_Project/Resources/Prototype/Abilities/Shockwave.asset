@@ -14,11 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: shockwave
   displayName: Shockwave
-  description: Short-range impact that damages a diamond of cells.
+  description: Short-range impact that damages every unit in a diamond of cells.
   icon: {fileID: 0}
   actionCost: 1
   cooldown: 2
   targetType: 0
+  targetTeam: 2
+  rangeType: 0
   targetingPattern: {fileID: 11400000, guid: a2222222222222222222222222222222, type: 2}
   impactPattern: {fileID: 11400000, guid: 20000000000000000000000000000002, type: 2}
   effects:

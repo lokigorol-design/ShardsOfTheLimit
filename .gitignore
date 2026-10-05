@@ -26,3 +26,9 @@ sysinfo.txt
 unity-create.log
 TestResults*.xml
 .static-check/
+
+# Codex working outputs
+.artifacts/
+.codex_artifacts/
+outputs/
+tmp/

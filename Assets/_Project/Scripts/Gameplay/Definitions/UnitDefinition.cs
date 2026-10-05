@@ -12,6 +12,8 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField] private string displayName = "Echo";
         [SerializeField] private Sprite portrait = null;
         [SerializeField] private GameObject visualPrefab = null;
+        [SerializeField] private Material visualMaterial = null;
+        [SerializeField] private Vector3 visualRotationOffset = Vector3.zero;
 
         [Header("Direct prototype stats")]
         [SerializeField, Min(1)] private int maximumHealth = 10;
@@ -19,11 +21,15 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField] private int initiative = 10;
         [SerializeField, Min(0)] private int movementRange = 3;
         [SerializeField] private List<AbilityDefinition> abilities = new List<AbilityDefinition>();
+        [SerializeField] private PassiveModifierDefinition passiveModifiers;
+        public PassiveModifierDefinition PassiveModifiers => passiveModifiers;
 
         public string StableId => stableId;
         public string DisplayName => displayName;
         public Sprite Portrait => portrait;
         public GameObject VisualPrefab => visualPrefab;
+        public Material VisualMaterial => visualMaterial;
+        public Vector3 VisualRotationOffset => visualRotationOffset;
         public int MaximumHealth => maximumHealth;
         public int MaximumShield => maximumShield;
         public int Initiative => initiative;

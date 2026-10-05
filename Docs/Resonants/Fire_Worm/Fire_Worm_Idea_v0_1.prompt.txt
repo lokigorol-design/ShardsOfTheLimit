@@ -1,0 +1,50 @@
+Generation: built-in image_gen; concept draft v0.1, not approved balance.
+Reference: D:/GameDev/ShardsOfTheLimit/Echo/Blaze worm/Blaze worm.png
+
+Use case: infographic-diagram / illustrated game creature concept sheet.
+Create ONE polished Russian-language illustrated concept sheet, portrait 2:3, high resolution, all text crisp readable Cyrillic. This is a design database IDEA sheet, not a balanced final stat card. Strong editorial grid with four numbered sections, cream/light parchment FLAT CLEAN background, charcoal text, burnt-orange rules, bold comic illustration, thick outlines, flat colors, large shapes, minimal texture. No weathered tiny texture or ornate clutter. Legibility and complete supplied content paramount.
+Input image 1 is CHARACTER IDENTITY reference, not page-layout reference. Preserve the massive limbless fire worm with broad toothy mouth, orange glowing eyes, dark segmented rocky body, sparse big spikes and metal-like bands. Simplify reference textures heavily. Do not turn it into dragon, snake, humanoid or insect. No legs/wings. Show main mature IV-rank worm in large 3/4 view above ground with clear silhouette, approximately upper third of sheet. Include a smaller broad, low, heavy basalt MAGMA WORM variant with molten trail in the branch section. Branch depiction is a proposed visualization. Ability icons should be simple square universal symbols WITHOUT worm portrait/anatomy; body artwork only in character visual areas.
+
+Exact main header:
+"ОГНЕННЫЙ ЧЕРВЬ"
+"FIRE WORM"
+Badge "ИДЕЯ РЕЗОНАНТА • v0.1"
+Section1 label "01 / ОБРАЗ"
+metadata "IV ранг • Начало: Иро"
+short role "Подземное сближение • огонь • давление по области"
+Slogan near hero: "Земля скрывает. Пламя выдаёт."
+
+Section2 "02 / АКТИВНЫЕ СПОСОБНОСТИ"
+Clear four-row table with small square icon, rank badge, bold title and short body. Do NOT add damage numbers or stats or cooldowns.
+Row1 rank "I" title "Дальний укус" body "Атака по прямой на увеличенной дистанции ближнего боя. Без захвата и дополнительных статусов."
+Row2 rank "I" title "Огненный плевок" body "Огненный снаряд поражает одну цель и накладывает Горение."
+Row3 rank "II*" title "Очищающий огонь" body "Снимает отрицательные эффекты с применяющего. Временно поджигает атакующих его в ближнем бою."
+Row4 rank "IV*" title "Выброс пламени" body "Конус пламени наносит урон и накладывает Горение на поражённые цели."
+
+Section3 "03 / ПАССИВНЫЕ СПОСОБНОСТИ И ВЕТКА"
+Use two parallel panels, visibly connect EACH base passive to corresponding branch replacement with small arrow or label, not a confusing branching tree.
+Base panel header "ОГНЕННАЯ ЛИНИЯ"
+"I • Подземный ход"
+"Обычное перемещение заменяется подземным переходом. Промежуточные препятствия игнорируются; выход — в свободной допустимой позиции."
+"IV* • Накопление импульса"
+"Неизрасходованное ОД в конце активации даёт дополнительное ОД на следующую. Бонус не накапливается."
+Branch panel header "МАГМОВЫЙ ЧЕРВЬ"
+"MAGMA WORM • Иро + Дрога"
+Show clear mini illustration of alternate massive basalt crawler in this panel.
+"Ответвление: II*"
+"Вместо подземного хода — Магмовый след"
+"Наземное движение оставляет магму. Наложение Горения заменяется созданием магмы. Любая магма не наносит урона."
+"Вместо накопления импульса — Питание магмой"
+"Нахождение на любой магме восстанавливает здоровье."
+Small branch note "Общие активные способности сохраняются."
+
+Section4 "04 / АВТОРСКИЙ ОБРАЗ"
+Copy exactly:
+"Не быстрый преследователь, а тяжёлая угроза из-под земли. Появление рядом заставляет врага менять позицию; огонь удерживает давление."
+Then an italic atmospheric quote:
+"Сначала под ногами теплеет камень. Потом замолкают глубины. Когда грунт раскрывает раскалённую пасть, бежать уже поздно."
+
+Footer, clearly readable:
+"* Предложение для обсуждения: ранги открытий и перехода ещё не утверждены. Названия новых пассивных способностей — рабочие. Баланс не задан."
+
+Do not add other mechanics, stats, numbers, fake UI controls, unrelated text, or extra creature forms. Keep all ability/passive body descriptions generic as supplied, no creature species references inside their effect text. Precise clean typography and generous enough readable body text; prioritize full accurate content over ornamental art.

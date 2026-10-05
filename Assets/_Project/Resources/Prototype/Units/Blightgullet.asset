@@ -18,10 +18,15 @@ MonoBehaviour:
   visualPrefab: {fileID: 3105668943183482276, guid: 8fd18a577e3262d48aafc16e4a0bdbaa, type: 3}
   visualMaterial: {fileID: 2100000, guid: 5837f43adf95b284fb6cf5be38a7e597, type: 2}
   visualRotationOffset: {x: 0, y: 0, z: 0}
-  maximumHealth: 100
-  maximumShield: 40
-  initiative: 40
+  maximumHealth: 110
+  maximumShield: 50
+  attack: 14
+  defense: 3
+  speed: 9
   movementRange: 3
+  periodicResistances:
+  - sourceId: POISON
+    percent: 50
   abilities:
   - {fileID: 11400000, guid: 251ab06c495655e469e36d5e5ebe8636, type: 2}
   - {fileID: 11400000, guid: 9887fb86bb5afce44b5b3cadc8981a76, type: 2}

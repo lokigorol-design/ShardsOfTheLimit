@@ -16,10 +16,13 @@ MonoBehaviour:
   displayName: Teal Skirmisher
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
-  maximumHealth: 18
-  maximumShield: 5
-  initiative: 14
+  maximumHealth: 90
+  maximumShield: 40
+  attack: 16
+  defense: 3
+  speed: 12
   movementRange: 5
+  periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b4444444444444444444444444444444, type: 2}
   - {fileID: 11400000, guid: 20000000000000000000000000000004, type: 2}

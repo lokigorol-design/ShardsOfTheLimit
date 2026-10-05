@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: IMMOBILIZED
   icon: {fileID: 0}
+  mechanic: 0
   maximumStacks: 1
   durationTicks: 100
   pulseInterval: 100

@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: POISON
   icon: {fileID: 0}
-  maximumStacks: 20
+  mechanic: 1
+  maximumStacks: 999
   durationTicks: 300
   pulseInterval: 100
   damagePerStack: 0

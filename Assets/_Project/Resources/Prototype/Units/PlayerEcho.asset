@@ -16,10 +16,13 @@ MonoBehaviour:
   displayName: Azure Vanguard
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
-  maximumHealth: 24
-  maximumShield: 8
-  initiative: 12
+  maximumHealth: 130
+  maximumShield: 60
+  attack: 15
+  defense: 5
+  speed: 9
   movementRange: 3
+  periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b1111111111111111111111111111111, type: 2}
   - {fileID: 11400000, guid: b2222222222222222222222222222222, type: 2}

@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10000000000000000000000000000005, type: 3}
   m_Name: RepairHealing
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.HealEffectDefinition
-  amount: 6
+  amount: 20

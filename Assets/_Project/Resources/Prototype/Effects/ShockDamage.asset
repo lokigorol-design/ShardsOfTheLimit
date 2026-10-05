@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10000000000000000000000000000002, type: 3}
   m_Name: ShockDamage
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.DamageEffectDefinition
-  amount: 5
+  attackMultiplier: 0.6
+  amount: 0

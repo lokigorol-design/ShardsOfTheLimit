@@ -189,9 +189,6 @@ namespace ShardsOfTheLimit.Runtime
             var clouds = new List<CloudAreaEffect>();
             var forecastStatuses = battleUnits.ToDictionary(u => u,
                 u => u.Statuses.ToDictionary(s => s.Key, s => s.Value));
-            int baseAbilityDamage = ability.Effects
-                .OfType<DamageEffectDefinition>()
-                .Sum(effect => effect.Amount);
 
             foreach (AbilityEffectDefinition effect in ability.Effects)
             {
@@ -242,10 +239,11 @@ namespace ShardsOfTheLimit.Runtime
                     }
                     else result = Calculate(
                         effect,
+                        source,
                         target,
                         state,
                         forecastBurning[target],
-                        baseAbilityDamage,
+                        CountOil(forecastStatuses[target]),
                         timelineTick,
                         grid,
                         forecastPositions[source],
@@ -256,6 +254,7 @@ namespace ShardsOfTheLimit.Runtime
                     if (result is PushResult push)
                     {
                         forecastPositions[target] = push.Destination;
+                        if (push.Collided) AddCollisionDamage(push, source, battleUnits, forecast, forecastPositions, results);
                     }
                     else if (result is BurnAppliedResult burn)
                     {
@@ -263,6 +262,11 @@ namespace ShardsOfTheLimit.Runtime
                             burn.NewDamagePerPulse,
                             burn.NewNextPulseTick,
                             burn.NewExpireTick);
+                        if (burn.ConsumedOilStacks > 0)
+                            foreach (string oilId in forecastStatuses[target]
+                                         .Where(s => s.Value.Rules.Mechanic == StatusMechanic.Oil)
+                                         .Select(s => s.Key).ToArray())
+                                forecastStatuses[target].Remove(oilId);
                     }
                     else
                     {
@@ -297,12 +301,39 @@ namespace ShardsOfTheLimit.Runtime
                 CloudAreaEffect.DirectionFrom(source.Cell, target), grid.GetCell(target).Height, tick);
         }
 
+        private static int CountOil(IReadOnlyDictionary<string, StackStatusState> statuses) =>
+            statuses.Values.Where(s => s.Rules.Mechanic == StatusMechanic.Oil).Sum(s => s.Stacks);
+
+        /// <summary>Collision (16.10.8): the displaced unit and the unit it hit each take 0.2 × ATK of the displacer.</summary>
+        private static void AddCollisionDamage(
+            PushResult push,
+            CombatUnit source,
+            IEnumerable<CombatUnit> units,
+            IDictionary<CombatUnit, CombatResourceState> forecast,
+            IReadOnlyDictionary<CombatUnit, GridCoordinate> positions,
+            ICollection<ICombatEffectResult> results)
+        {
+            double raw = source.Attack * ForcedMovementCalculator.CollisionAttackMultiplier;
+            if (raw <= 0) return;
+            CombatUnit struck = units.FirstOrDefault(unit => unit != push.Target && forecast.ContainsKey(unit) &&
+                                                             positions.TryGetValue(unit, out var cell) &&
+                                                             cell == push.CollisionCell.Value);
+            foreach (CombatUnit victim in new[] { push.Target, struck })
+            {
+                if (victim == null || forecast[victim].Health <= 0) continue;
+                DamageResult hit = CombatEffectCalculator.Damage(victim, forecast[victim], raw);
+                results.Add(hit);
+                forecast[victim] = CombatEffectCalculator.Apply(forecast[victim], hit);
+            }
+        }
+
         private static ICombatEffectResult Calculate(
             AbilityEffectDefinition effect,
+            CombatUnit source,
             CombatUnit target,
             CombatResourceState state,
             BurningState burning,
-            int baseAbilityDamage,
+            int oilStacks,
             long timelineTick,
             TacticalGrid grid,
             GridCoordinate sourcePosition,
@@ -312,7 +343,7 @@ namespace ShardsOfTheLimit.Runtime
             switch (effect)
             {
                 case DamageEffectDefinition damage:
-                    return CombatEffectCalculator.Damage(target, state, damage.Amount);
+                    return CombatEffectCalculator.Damage(target, state, damage.RawDamage(source.Attack));
                 case HealEffectDefinition heal:
                     return CombatEffectCalculator.Heal(target, state, heal.Amount);
                 case GrantShieldEffectDefinition shield:
@@ -321,10 +352,10 @@ namespace ShardsOfTheLimit.Runtime
                     return BurningCalculator.Apply(
                         target,
                         burning,
-                        baseAbilityDamage,
-                        burn.DamagePercentage,
+                        BurningCalculator.PowerFromAttack(source.Attack, burn.AttackMultiplier),
                         burn.Duration,
-                        timelineTick);
+                        timelineTick,
+                        oilStacks);
                 case PushEffectDefinition push:
                     return ForcedMovementCalculator.Push(
                         grid,

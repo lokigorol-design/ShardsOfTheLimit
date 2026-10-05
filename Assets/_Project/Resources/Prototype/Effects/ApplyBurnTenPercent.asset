@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: ApplyBurnTenPercent
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.ApplyBurnEffectDefinition
   icon: {fileID: 21300000, guid: 144a2677c6b2c0e4a84dc78bbd1d5d5a, type: 3}
-  damagePercentage: 10
+  attackMultiplier: 0.25
   duration: 3

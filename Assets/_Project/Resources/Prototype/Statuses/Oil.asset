@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: OIL
   icon: {fileID: 0}
-  maximumStacks: 20
+  mechanic: 3
+  maximumStacks: 999
   durationTicks: 300
   pulseInterval: 100
   damagePerStack: 0

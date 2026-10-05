@@ -16,10 +16,13 @@ MonoBehaviour:
   displayName: Cobalt Ranger
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
-  maximumHealth: 16
-  maximumShield: 4
-  initiative: 10
+  maximumHealth: 90
+  maximumShield: 40
+  attack: 17
+  defense: 2
+  speed: 10
   movementRange: 4
+  periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b3333333333333333333333333333333, type: 2}
   - {fileID: 11400000, guid: 20000000000000000000000000000004, type: 2}

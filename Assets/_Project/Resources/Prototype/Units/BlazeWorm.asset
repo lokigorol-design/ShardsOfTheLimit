@@ -18,10 +18,15 @@ MonoBehaviour:
   visualPrefab: {fileID: 919132149155446097, guid: fe588a21443b2074ba71e4362365bb4d, type: 3}
   visualMaterial: {fileID: 2100000, guid: 70000000000000000000000000000001, type: 2}
   visualRotationOffset: {x: 90, y: -135, z: 0}
-  maximumHealth: 100
-  maximumShield: 40
-  initiative: 40
-  movementRange: 3
+  maximumHealth: 150
+  maximumShield: 15
+  attack: 18
+  defense: 4
+  speed: 8
+  movementRange: 2
+  periodicResistances:
+  - sourceId: BURNING
+    percent: 50
   abilities:
   - {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   - {fileID: 11400000, guid: b1000000000000000000000000000002, type: 2}

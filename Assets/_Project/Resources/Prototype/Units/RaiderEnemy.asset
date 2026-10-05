@@ -16,10 +16,13 @@ MonoBehaviour:
   displayName: Amber Raider
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
-  maximumHealth: 14
-  maximumShield: 3
-  initiative: 11
+  maximumHealth: 85
+  maximumShield: 30
+  attack: 17
+  defense: 2
+  speed: 11
   movementRange: 4
+  periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b4444444444444444444444444444444, type: 2}
   - {fileID: 11400000, guid: 20000000000000000000000000000004, type: 2}

@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10000000000000000000000000000002, type: 3}
   m_Name: RepulseDamage
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.DamageEffectDefinition
-  amount: 7
+  attackMultiplier: 0.8
+  amount: 0

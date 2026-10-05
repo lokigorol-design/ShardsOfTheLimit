@@ -75,7 +75,7 @@ public static class BlightgulletContentSetup
         var cc = Cloud("CorrosionCloud", "Corrosion Cloud", corrosion, cross, new Color(1f,.65f,.02f, .4f));
         var oc = Cloud("OilCloud", "Oil Cloud", oil, cross, new Color(.22f,.12f,.38f, .4f));
         var small = Cloud("VenomousMudCloud", "Venomous Mud Cloud", poison, single, pc.color);
-        var damage = Asset<DamageEffectDefinition>("Effects/MudDamage", d => Set(d,"amount",15));
+        var damage = Asset<DamageEffectDefinition>("Effects/MudDamage", d => { Set(d,"attackMultiplier",0.8f); Set(d,"amount",0); });
         var immobilize = Asset<ApplyStatusEffectDefinition>("Effects/MudImmobilize", d => d.status = immobilized);
         var pull = Asset<PullEffectDefinition>("Effects/TonguePull", d => d.distance = 3);
         var pe = Asset<CreateCloudEffectDefinition>("Effects/CreatePoisonCloud", d => d.cloud = pc);
@@ -93,7 +93,7 @@ public static class BlightgulletContentSetup
             Set(u,"stableId","blightgullet"); Set(u,"displayName","Blightgullet");
             Set(u,"portrait",AssetDatabase.LoadAssetAtPath<Sprite>(Icons + "Blightgullet IV.png"));
             Set(u,"visualPrefab",prefab); Set(u,"visualMaterial",material);
-            Set(u,"maximumHealth",100); Set(u,"maximumShield",40); Set(u,"initiative",40); Set(u,"movementRange",3);
+            Set(u,"maximumHealth",110); Set(u,"maximumShield",50); Set(u,"attack",14); Set(u,"defense",3); Set(u,"speed",9); Set(u,"movementRange",3);
             Set(u,"passiveModifiers",passive);
             SetArray(u,"abilities",mud,poisonAbility,corrosionAbility,tongue,oilAbility);
         });
@@ -137,6 +137,7 @@ public static class BlightgulletContentSetup
         if (value is string s) p.stringValue = s;
         else if (value is bool b) p.boolValue = b;
         else if (value is int n) p.intValue = n;
+        else if (value is float f) p.floatValue = f;
         else p.objectReferenceValue = (UnityEngine.Object)value;
         so.ApplyModifiedPropertiesWithoutUndo();
     }

@@ -14,7 +14,7 @@ namespace ShardsOfTheLimit.Tests
         private AreaEffectWorld world;
         private static GridCoordinate C(int x, int y = 0) => new GridCoordinate(x,y);
         private static CombatUnit Unit(string name, GridCoordinate cell, Team team = Team.Opponent) =>
-            new CombatUnit(name,name,100,40,40,3,team,ControlType.Player,cell);
+            new CombatUnit(name,name,100,40,10,3,team,ControlType.Player,cell,attack:14);
         [SetUp] public void Setup()
         {
             grid = new TacticalGrid(Enumerable.Range(0,7).SelectMany(x => Enumerable.Range(0,4).Select(y => new GridCell(C(x,y),0,true))));

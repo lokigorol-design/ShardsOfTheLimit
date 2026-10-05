@@ -580,11 +580,16 @@ namespace ShardsOfTheLimit.Presentation
                 definition.DisplayName,
                 definition.MaximumHealth,
                 definition.MaximumShield,
-                definition.Initiative,
+                definition.Speed,
                 definition.MovementRange,
                 team,
                 controlType,
-                coordinate);
+                coordinate,
+                definition.Attack,
+                definition.Defense);
+            foreach (PeriodicResistance resistance in definition.PeriodicResistances)
+                if (!string.IsNullOrWhiteSpace(resistance.sourceId))
+                    unit.SetPeriodicResistance(resistance.sourceId, resistance.percent);
             units.Add(unit);
             definitionsByUnit.Add(unit, definition);
 
@@ -987,14 +992,16 @@ namespace ShardsOfTheLimit.Presentation
                 }
                 else if (result is PushResult push)
                 {
-                    string pushText = push.StepsMoved > 0 ? $"PUSH {push.StepsMoved}" : "PUSH BLOCKED";
+                    string pushText = (push.StepsMoved > 0 ? $"PUSH {push.StepsMoved}" : "PUSH BLOCKED") +
+                                      (push.Collided ? " · COLLISION" : string.Empty);
                     feedback.AddFloatingText(labelPosition, pushText, new Color(0.85f, 0.45f, 1f));
                 }
                 else if (result is BurnAppliedResult burn)
                 {
                     feedback.AddFloatingText(
                         labelPosition + Vector3.up * 0.22f,
-                        $"BURN +{burn.AddedDamagePerPulse}/100t · {GetBurnPulseCount(burn)}x",
+                        $"BURN {burn.NewDamagePerPulse}/100t · {GetBurnPulseCount(burn)}x" +
+                        (burn.ConsumedOilStacks > 0 ? $" · OIL ×{burn.ConsumedOilStacks}" : string.Empty),
                         new Color(1f, 0.42f, 0.05f));
                 }
                 else if (result is StatusAppliedResult statusResult)
@@ -1091,14 +1098,16 @@ namespace ShardsOfTheLimit.Presentation
                     return $"{result.Target.DisplayName}: {prefix}+{result.ShieldDelta} shield";
                 case CombatEffectKind.Push:
                     var push = (PushResult)result;
+                    string collision = push.Collided ? $", collision at {push.CollisionCell.Value}" : string.Empty;
                     return push.StepsMoved > 0
-                        ? $"{result.Target.DisplayName}: {prefix}push {push.Origin}→{push.Destination}"
-                        : $"{result.Target.DisplayName}: {prefix}push blocked";
+                        ? $"{result.Target.DisplayName}: {prefix}push {push.Origin}→{push.Destination}{collision}"
+                        : $"{result.Target.DisplayName}: {prefix}push blocked{collision}";
                 case CombatEffectKind.Burning:
                     if (result is BurnAppliedResult burn)
                     {
-                        return $"{result.Target.DisplayName}: {prefix}burn +{burn.AddedDamagePerPulse}/100 ticks, " +
-                               $"total {burn.NewDamagePerPulse}/100 ticks for {GetBurnPulseCount(burn)} pulses";
+                        string oil = burn.ConsumedOilStacks > 0 ? $", burned {burn.ConsumedOilStacks} oil" : string.Empty;
+                        return $"{result.Target.DisplayName}: {prefix}burn {burn.AddedDamagePerPulse}/100 ticks{oil}, " +
+                               $"strongest {burn.NewDamagePerPulse}/100 ticks for {GetBurnPulseCount(burn)} pulses";
                     }
 
                     var tick = (BurnTickResult)result;
@@ -2189,7 +2198,7 @@ namespace ShardsOfTheLimit.Presentation
                     textX += 24f;
                 }
 
-                string text = $"{prefix} {unit.DisplayName}  HP {unit.CurrentHealth}/{unit.MaximumHealth}  SH {unit.CurrentShield}/{unit.MaximumShield}{burning}";
+                string text = $"{prefix} {unit.DisplayName}  HP {unit.CurrentHealth}/{unit.MaximumHealth}  SH {unit.CurrentShield}/{unit.MaximumShield}  ATK {unit.Attack} DEF {unit.EffectiveDefense:0.#} SPD {unit.Speed}{burning}";
                 GUI.Label(new Rect(textX, rowY, width - (textX - x), 22f), text);
                 row++;
             }

@@ -111,7 +111,7 @@ namespace ShardsOfTheLimit.Domain
         public void Add(CloudAreaEffect cloud) { clouds.Add(cloud); }
         public long NextEventTick => clouds.SelectMany(c => new[] { c.NextPulseTick, c.NextMoveTick, c.ExpireTick })
             .Concat(units.Where(u => !u.IsDefeated).SelectMany(u => u.Statuses.Values.SelectMany(s =>
-                s.Rules.DamagePerStack > 0 ? new[] { s.NextPulseTick, s.ExpireTick } : new[] { s.ExpireTick })))
+                s.Rules.Pulses ? new[] { s.NextPulseTick, s.ExpireTick } : new[] { s.ExpireTick })))
             .DefaultIfEmpty(long.MaxValue).Min();
         public IReadOnlyList<ICombatEffectResult> ProcessTick(long tick)
         {
@@ -120,9 +120,10 @@ namespace ShardsOfTheLimit.Domain
             {
                 // Status expiry is exclusive; clouds have an inclusive final pulse.
                 unit.ExpireStatuses(tick);
-                foreach (var status in unit.Statuses.Values.Where(s => s.Rules.DamagePerStack > 0 && s.NextPulseTick == tick))
+                foreach (var status in unit.Statuses.Values.Where(s => s.Rules.Pulses && s.NextPulseTick == tick).ToArray())
                 {
-                    var damage = CombatEffectCalculator.Damage(unit, unit.ResourceState, status.Stacks * status.Rules.DamagePerStack);
+                    if (unit.IsDefeated) break;
+                    var damage = StatusCalculator.Pulse(unit, status);
                     CombatEffectResolver.Apply(new[] { damage }); results.Add(damage);
                     status.NextPulseTick += status.Rules.PulseInterval;
                 }
@@ -169,7 +170,7 @@ namespace ShardsOfTheLimit.Domain
             foreach (var unit in units.Where(u => !u.IsDefeated))
                 foreach (var status in unit.Statuses.Values)
                 {
-                    if (status.Rules.DamagePerStack > 0)
+                    if (status.Rules.Pulses)
                         for (long tick = status.NextPulseTick, n = 0; tick < status.ExpireTick && n < count; tick += status.Rules.PulseInterval, n++)
                             if (tick > after) yield return new TimelineEvent(tick, TimelineEventKind.StatusPulse, unit, status.Rules.Id);
                     yield return new TimelineEvent(status.ExpireTick, TimelineEventKind.StatusPulse, unit, "EXPIRE " + status.Rules.Id);

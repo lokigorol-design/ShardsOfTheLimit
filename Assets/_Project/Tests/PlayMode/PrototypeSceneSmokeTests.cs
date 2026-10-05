@@ -44,15 +44,9 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(feedback, Is.Not.Null);
             Assert.That(controller.CurrentTimelineTick, Is.GreaterThan(0));
             Assert.That(controller.ActiveUnit.ControlType, Is.EqualTo(ControlType.Player));
-            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Blaze Worm"));
+            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Teal Skirmisher"),
+                "Speed 12 acts first (83 ticks); the Speed 8 worm acts at 125.");
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
-            Assert.That(controller.ActiveUnit.CurrentHealth, Is.EqualTo(100));
-            Assert.That(controller.ActiveUnit.CurrentShield, Is.EqualTo(40));
-            Assert.That(controller.CurrentReachableCells[new GridCoordinate(0, 3)], Is.EqualTo(3));
-            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(4, 3)), Is.False,
-                "Height cost must exclude a geometrically close but over-budget cell.");
-            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(1, 4)), Is.False,
-                "The isolated height-3 cell must not be previewed as reachable.");
             Assert.That(Object.FindObjectsByType<CellView>().Length, Is.EqualTo(100));
             Assert.That(Object.FindObjectsByType<CombatUnitView>().Length, Is.EqualTo(6));
             CombatUnitView[] unitViews = Object.FindObjectsByType<CombatUnitView>();
@@ -128,41 +122,59 @@ namespace ShardsOfTheLimit.Tests
             yield return new WaitForSeconds(1f);
             Assert.That(controller.CameraZoom, Is.EqualTo(11.5f).Within(0.01f));
 
-            Assert.That(controller.RequestMove(new GridCoordinate(4, 3)), Is.False);
-            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False);
-            Assert.That(controller.RequestMove(new GridCoordinate(0, 3)), Is.True);
-            float movementTimeout = Time.time + 2f;
-            while (Time.time < movementTimeout && controller.ActiveUnit.Cell != new GridCoordinate(0, 3))
-            {
-                yield return null;
-            }
-            Assert.That(controller.ActiveUnit.Cell, Is.EqualTo(new GridCoordinate(0, 3)));
-            Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(1));
-
             int playerDurabilityBefore = controller.Units
                 .Where(unit => unit.Team == Team.Player)
                 .Sum(unit => unit.CurrentHealth + unit.CurrentShield);
 
-            controller.RequestEndTurn();
-            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Teal Skirmisher"));
-            controller.RequestEndTurn();
+            // The log keeps only recent lines, so remember everything shown while turns pass.
+            var seenLog = new System.Collections.Generic.HashSet<string>();
 
-            float timeout = Time.time + 12f;
-            while (Time.time < timeout && controller.ActiveUnit != null &&
-                   controller.ActiveUnit.ControlType != ControlType.Player)
+            // Skirmisher → two AI raiders → Ranger → Blaze Worm (Speed 12, 11, 11, 10, 8).
+            float timeout = Time.time + 20f;
+            while (Time.time < timeout && controller.ActiveUnit.DisplayName != "Blaze Worm")
             {
+                if (controller.ActiveUnit.ControlType == ControlType.Player) controller.RequestEndTurn();
+                seenLog.UnionWith(feedback.RecentEntries);
                 yield return null;
             }
 
+            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Blaze Worm"));
+            Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
+            Assert.That(controller.ActiveUnit.MaximumHealth, Is.EqualTo(150));
+            Assert.That(controller.ActiveUnit.Attack, Is.EqualTo(18));
+            Assert.That(controller.CurrentReachableCells[new GridCoordinate(0, 2)], Is.EqualTo(2));
+            Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(0, 3)), Is.False,
+                "Fire Worm I has 2 movement points per move.");
+            Assert.That(controller.RequestMove(new GridCoordinate(0, 3)), Is.False);
+            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False);
+            Assert.That(controller.RequestMove(new GridCoordinate(0, 2)), Is.True);
+            float movementTimeout = Time.time + 2f;
+            while (Time.time < movementTimeout && controller.ActiveUnit.Cell != new GridCoordinate(0, 2))
+            {
+                yield return null;
+            }
+            Assert.That(controller.ActiveUnit.Cell, Is.EqualTo(new GridCoordinate(0, 2)));
+            Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(1));
+
+            controller.RequestEndTurn();
+            timeout = Time.time + 12f;
+            while (Time.time < timeout && controller.ActiveUnit != null &&
+                   controller.ActiveUnit.ControlType != ControlType.Player)
+            {
+                seenLog.UnionWith(feedback.RecentEntries);
+                yield return null;
+            }
+            seenLog.UnionWith(feedback.RecentEntries);
+
             Assert.That(controller.ActiveUnit.ControlType, Is.EqualTo(ControlType.Player));
-            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Cobalt Ranger"));
+            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Teal Skirmisher"));
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             int playerDurabilityAfter = controller.Units
                 .Where(unit => unit.Team == Team.Player)
                 .Sum(unit => unit.CurrentHealth + unit.CurrentShield);
             Assert.That(playerDurabilityAfter, Is.LessThan(playerDurabilityBefore));
-            Assert.That(feedback.RecentEntries.Any(entry => entry.Contains("casts")), Is.True);
-            Assert.That(feedback.RecentEntries.Any(entry => entry.Contains("shield damage")), Is.True);
+            Assert.That(seenLog.Any(entry => entry.Contains("casts")), Is.True);
+            Assert.That(seenLog.Any(entry => entry.Contains("shield damage")), Is.True);
         }
 
         [UnityTest]

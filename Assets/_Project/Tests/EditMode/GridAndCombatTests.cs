@@ -155,7 +155,7 @@ namespace ShardsOfTheLimit.Tests
             int healthBefore = ally.CurrentHealth;
             int enemyHealthBefore = enemy.CurrentHealth;
             AbilityResolution preview = AbilityRuntime.Preview(repair, grid, source, ally.Cell, units);
-            Assert.That(preview.Results.Single(result => result.Target == ally).HealthDelta, Is.EqualTo(6));
+            Assert.That(preview.Results.Single(result => result.Target == ally).HealthDelta, Is.EqualTo(7));
             Assert.That(preview.Results.Single(result => result.Target == enemy).HealthDelta, Is.EqualTo(4));
             Assert.That(ally.CurrentHealth, Is.EqualTo(healthBefore));
             Assert.That(enemy.CurrentHealth, Is.EqualTo(enemyHealthBefore));
@@ -163,7 +163,7 @@ namespace ShardsOfTheLimit.Tests
             AbilityResolution execution = AbilityRuntime.Execute(repair, grid, source, ally.Cell, units);
             Assert.That(execution.Results.Single(result => result.Target == ally).HealthDelta,
                 Is.EqualTo(preview.Results.Single(result => result.Target == ally).HealthDelta));
-            Assert.That(ally.CurrentHealth, Is.EqualTo(healthBefore + 6));
+            Assert.That(ally.CurrentHealth, Is.EqualTo(healthBefore + 7));
             Assert.That(enemy.CurrentHealth, Is.EqualTo(enemy.MaximumHealth));
         }
 
@@ -189,32 +189,169 @@ namespace ShardsOfTheLimit.Tests
         }
 
         [Test]
-        public void TimelineUsesBoundedInitiativeAndSkipsDefeatedUnits()
+        public void TimelineUsesSpeedIntervalsAndSkipsDefeatedUnits()
         {
-            CombatUnit slow = CreateUnit(new GridCoordinate(0, 0), initiative: 5);
-            CombatUnit fast = CreateUnit(new GridCoordinate(1, 0), initiative: 12);
-            CombatUnit middle = CreateUnit(new GridCoordinate(2, 0), initiative: 8);
+            CombatUnit slow = CreateUnit(new GridCoordinate(0, 0), speed: 5);
+            CombatUnit fast = CreateUnit(new GridCoordinate(1, 0), speed: 12);
+            CombatUnit middle = CreateUnit(new GridCoordinate(2, 0), speed: 8);
             var turns = new TimelineCoordinator(new[] { slow, fast, middle }, 2);
 
-            Assert.That(turns.StartBattle(), Is.SameAs(fast));
+            Assert.That(turns.StartBattle(), Is.SameAs(fast), "Speed 12 acts at tick 83.");
             DamageResolver.Apply(new[] { middle }, new[] { middle.Cell }, 99);
 
+            Assert.That(turns.Advance(), Is.SameAs(fast), "Second fast turn at 166 precedes slow at 200.");
             Assert.That(turns.Advance(), Is.SameAs(slow));
-            Assert.That(turns.Advance(), Is.SameAs(fast));
             Assert.That(turns.LivingUnits, Is.EquivalentTo(new[] { fast, slow }));
-            Assert.That(InitiativeTimeline.GetRate(1000) / InitiativeTimeline.GetRate(1),
-                Is.EqualTo(5d).Within(0.0001d));
-            Assert.That(InitiativeTimeline.GetInterval(30), Is.EqualTo(112));
-            Assert.That(InitiativeTimeline.GetInterval(40), Is.EqualTo(100));
-            Assert.That(InitiativeTimeline.GetInterval(50), Is.EqualTo(91));
+        }
+
+        [Test]
+        public void SpeedIntervalIsThousandOverSpeedBoundedThirtyToTwoHundred()
+        {
+            Assert.That(SpeedTimeline.GetInterval(10), Is.EqualTo(100));
+            Assert.That(SpeedTimeline.GetInterval(8), Is.EqualTo(125));
+            Assert.That(SpeedTimeline.GetInterval(9), Is.EqualTo(111));
+            Assert.That(SpeedTimeline.GetInterval(33), Is.EqualTo(30));
+            Assert.That(SpeedTimeline.GetInterval(50), Is.EqualTo(30));
+            Assert.That(SpeedTimeline.GetInterval(5), Is.EqualTo(200));
+            Assert.That(SpeedTimeline.GetInterval(1), Is.EqualTo(200));
+        }
+
+        [Test]
+        public void DefenseFormulaMatchesDesignExamples()
+        {
+            Assert.That(DefenseFormula.Apply(5, 5), Is.EqualTo(2.5d).Within(0.001d));
+            Assert.That(DefenseFormula.Apply(15, 5), Is.EqualTo(11.25d).Within(0.001d));
+            Assert.That(DefenseFormula.Apply(40, 5), Is.EqualTo(35.56d).Within(0.01d));
+            Assert.That(DefenseFormula.Apply(15, -5), Is.EqualTo(22.5d).Within(0.001d));
+            Assert.That(DefenseFormula.Apply(40, -5), Is.EqualTo(45.71d).Within(0.01d));
+            Assert.That(DefenseFormula.Apply(10, -100), Is.EqualTo(40d).Within(0.001d), "Negative Defense caps at ×4.");
+
+            CombatUnit armored = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100, defense: 5);
+            Assert.That(CombatEffectCalculator.Damage(armored, armored.ResourceState, 15).HealthDamage, Is.EqualTo(11));
+            Assert.That(CombatEffectCalculator.Damage(armored, armored.ResourceState, 1).HealthDamage, Is.EqualTo(1),
+                "A hit always deals at least 1.");
+        }
+
+        [Test]
+        public void AbilityDamageScalesWithSourceAttack()
+        {
+            AbilityDefinition heavyStrike = Resources.Load<AbilityDefinition>("Prototype/Abilities/HeavyStrike");
+            TacticalGrid grid = CreateGrid(4, 4);
+            CombatUnit weak = CreateUnit(new GridCoordinate(1, 1), team: Team.Player, attack: 10);
+            CombatUnit strong = CreateUnit(new GridCoordinate(1, 2), team: Team.Player, attack: 20);
+            CombatUnit target = CreateUnit(new GridCoordinate(2, 1), maximumHealth: 100);
+            CombatUnit secondTarget = CreateUnit(new GridCoordinate(2, 2), maximumHealth: 100);
+
+            int weakHit = -AbilityRuntime.Preview(heavyStrike, grid, weak, target.Cell, new[] { weak, target })
+                .Results.OfType<DamageResult>().Single().HealthDelta;
+            int strongHit = -AbilityRuntime.Preview(heavyStrike, grid, strong, secondTarget.Cell, new[] { strong, secondTarget })
+                .Results.OfType<DamageResult>().Single().HealthDelta;
+            Assert.That(weakHit, Is.EqualTo(12), "Heavy Strike is 1.2 × ATK.");
+            Assert.That(strongHit, Is.EqualTo(24));
+        }
+
+        [Test]
+        public void PeriodicDamageIgnoresDefenseAndUsesPerSourceResistance()
+        {
+            CombatUnit worm = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100, defense: 50);
+            worm.SetPeriodicResistance(BurningCalculator.ResistanceId, 50);
+            Assert.That(CombatEffectCalculator.PeriodicDamage(worm, worm.ResourceState, 10, "BURNING").HealthDamage,
+                Is.EqualTo(5));
+            Assert.That(CombatEffectCalculator.PeriodicDamage(worm, worm.ResourceState, 10, "POISON").HealthDamage,
+                Is.EqualTo(10), "Defense never reduces periodic damage.");
+            worm.SetPeriodicResistance("MAGMA", 100);
+            Assert.That(CombatEffectCalculator.PeriodicDamage(worm, worm.ResourceState, 10, "MAGMA").HealthDamage,
+                Is.Zero);
+        }
+
+        [Test]
+        public void CorrosionLowersDefenseAndResistanceBelowZero()
+        {
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100, defense: 10);
+            target.SetPeriodicResistance("POISON", 50);
+            var corrosion = new StatusRules("CORROSION", 999, 300, mechanic: StatusMechanic.Corrosion);
+            target.ApplyStatus(StatusCalculator.Apply(target, corrosion, 12, 0, "source"));
+
+            Assert.That(target.EffectiveDefense, Is.EqualTo(-2d).Within(0.001d));
+            Assert.That(target.GetPeriodicResistance("POISON"), Is.EqualTo(-70));
+            Assert.That(CombatEffectCalculator.PeriodicDamage(target, target.ResourceState, 10, "POISON").HealthDamage,
+                Is.EqualTo(17));
+        }
+
+        [Test]
+        public void PoisonPulseUsesMaximumHealthPercentFormula()
+        {
+            Assert.That(StatusMechanicRules.PoisonPulse(100, 1), Is.EqualTo(3d).Within(0.001d));
+            Assert.That(StatusMechanicRules.PoisonPulse(100, 3), Is.EqualTo(5.3d).Within(0.05d));
+            Assert.That(StatusMechanicRules.PoisonPulse(100, 10), Is.EqualTo(9.93d).Within(0.05d));
+            Assert.That(StatusMechanicRules.PoisonPulse(1000, 20), Is.EqualTo(142.5d).Within(0.5d));
+
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 200, defense: 30);
+            var grid = CreateGrid(1, 1);
+            var world = new AreaEffectWorld(grid, new[] { target });
+            var poison = new StatusRules("POISON", 999, 300, mechanic: StatusMechanic.Poison);
+            target.ApplyStatus(StatusCalculator.Apply(target, poison, 3, 0, "source"));
+            world.ProcessTick(100);
+            Assert.That(target.CurrentHealth, Is.EqualTo(189), "3 stacks: 5.3% of 200 = 11, Defense ignored.");
+        }
+
+        [Test]
+        public void OilAndSlowReduceMovementPoints()
+        {
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0));
+            target.ApplyStatus(StatusCalculator.Apply(target,
+                new StatusRules("OIL", 999, 300, mechanic: StatusMechanic.Oil), 1, 0, "source"));
+            Assert.That(target.AvailableMovementRange, Is.EqualTo(2));
+            target.ApplyStatus(StatusCalculator.Apply(target,
+                new StatusRules("SLOW", 1, 300, mechanic: StatusMechanic.Slow), 1, 0, "source"));
+            Assert.That(target.AvailableMovementRange, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void VulnerabilityAddsTwentyPercentAfterDefense()
+        {
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100);
+            target.ApplyStatus(StatusCalculator.Apply(target,
+                new StatusRules("VULNERABILITY", 1, 200, mechanic: StatusMechanic.Vulnerability), 1, 0, "source"));
+            Assert.That(CombatEffectCalculator.Damage(target, target.ResourceState, 10).HealthDamage, Is.EqualTo(12));
+        }
+
+        [Test]
+        public void PushIntoUnitDealsCollisionDamageToBothSides()
+        {
+            AbilityDefinition repulse = Resources.Load<AbilityDefinition>("Prototype/Abilities/RepulseStrike");
+            TacticalGrid grid = CreateGrid(6, 3);
+            CombatUnit source = CreateUnit(new GridCoordinate(1, 1), team: Team.Player, attack: 20);
+            CombatUnit target = CreateUnit(new GridCoordinate(2, 1), maximumHealth: 100);
+            CombatUnit wall = CreateUnit(new GridCoordinate(4, 1), maximumHealth: 100);
+            CombatUnit[] units = { source, target, wall };
+
+            AbilityResolution preview = AbilityRuntime.Preview(repulse, grid, source, target.Cell, units);
+            PushResult push = preview.Results.OfType<PushResult>().Single();
+            Assert.That(push.Destination, Is.EqualTo(new GridCoordinate(3, 1)));
+            Assert.That(push.CollisionCell, Is.EqualTo(new GridCoordinate(4, 1)));
+
+            AbilityRuntime.Execute(repulse, grid, source, target.Cell, units);
+            Assert.That(target.CurrentHealth, Is.EqualTo(100 - 16 - 4), "0.8 × ATK hit, then 0.2 × ATK collision.");
+            Assert.That(wall.CurrentHealth, Is.EqualTo(96), "The struck unit takes the same collision damage.");
+        }
+
+        [Test]
+        public void PushStoppedByMapEdgeIsNotACollision()
+        {
+            var grid = CreateGrid(3, 1);
+            CombatUnit target = CreateUnit(new GridCoordinate(1, 0));
+            PushResult push = ForcedMovementCalculator.Push(grid, target, new GridCoordinate(0, 0), target.Cell, 3, _ => false);
+            Assert.That(push.Destination, Is.EqualTo(new GridCoordinate(2, 0)));
+            Assert.That(push.Collided, Is.False);
         }
 
         [Test]
         public void UpcomingTimelineReturnsTenChronologicalEvents()
         {
-            CombatUnit slow = CreateUnit(new GridCoordinate(0, 0), initiative: 5);
-            CombatUnit fast = CreateUnit(new GridCoordinate(1, 0), initiative: 12);
-            CombatUnit middle = CreateUnit(new GridCoordinate(2, 0), initiative: 8);
+            CombatUnit slow = CreateUnit(new GridCoordinate(0, 0), speed: 5);
+            CombatUnit fast = CreateUnit(new GridCoordinate(1, 0), speed: 12);
+            CombatUnit middle = CreateUnit(new GridCoordinate(2, 0), speed: 8);
             var turns = new TimelineCoordinator(new[] { slow, fast, middle }, 2);
 
             turns.StartBattle();
@@ -281,12 +418,12 @@ namespace ShardsOfTheLimit.Tests
         [Test]
         public void SixUnitTimelineKeepsInitiativeTiesStable()
         {
-            CombatUnit skirmisher = CreateUnit(new GridCoordinate(0, 0), initiative: 14);
-            CombatUnit vanguard = CreateUnit(new GridCoordinate(0, 1), initiative: 12);
-            CombatUnit firstRaider = CreateUnit(new GridCoordinate(5, 1), initiative: 11);
-            CombatUnit secondRaider = CreateUnit(new GridCoordinate(5, 2), initiative: 11);
-            CombatUnit ranger = CreateUnit(new GridCoordinate(0, 2), initiative: 10);
-            CombatUnit brute = CreateUnit(new GridCoordinate(5, 3), initiative: 8);
+            CombatUnit skirmisher = CreateUnit(new GridCoordinate(0, 0), speed: 14);
+            CombatUnit vanguard = CreateUnit(new GridCoordinate(0, 1), speed: 12);
+            CombatUnit firstRaider = CreateUnit(new GridCoordinate(5, 1), speed: 11);
+            CombatUnit secondRaider = CreateUnit(new GridCoordinate(5, 2), speed: 11);
+            CombatUnit ranger = CreateUnit(new GridCoordinate(0, 2), speed: 10);
+            CombatUnit brute = CreateUnit(new GridCoordinate(5, 3), speed: 8);
             var turns = new TimelineCoordinator(
                 new[] { vanguard, ranger, skirmisher, brute, firstRaider, secondRaider },
                 2);
@@ -485,7 +622,7 @@ namespace ShardsOfTheLimit.Tests
             AbilityResolution preview = AbilityRuntime.Preview(repulse, grid, source, target.Cell, units);
             DamageResult previewDamage = preview.Results.OfType<DamageResult>().Single();
             PushResult previewPush = preview.Results.OfType<PushResult>().Single();
-            Assert.That(previewDamage.HealthDamage, Is.EqualTo(7));
+            Assert.That(previewDamage.HealthDamage, Is.EqualTo(8), "0.8 × ATK 10 against Defense 0.");
             Assert.That(previewPush.Destination, Is.EqualTo(new GridCoordinate(4, 1)));
             Assert.That(target.CurrentHealth, Is.EqualTo(target.MaximumHealth));
             Assert.That(target.Cell, Is.EqualTo(new GridCoordinate(2, 1)));
@@ -493,7 +630,7 @@ namespace ShardsOfTheLimit.Tests
             AbilityResolution execution = AbilityRuntime.Execute(repulse, grid, source, target.Cell, units);
             PushResult executedPush = execution.Results.OfType<PushResult>().Single();
             Assert.That(executedPush.Path, Is.EqualTo(previewPush.Path));
-            Assert.That(target.CurrentHealth, Is.EqualTo(target.MaximumHealth - 7));
+            Assert.That(target.CurrentHealth, Is.EqualTo(target.MaximumHealth - 8));
             Assert.That(target.Cell, Is.EqualTo(new GridCoordinate(4, 1)));
         }
 
@@ -647,22 +784,56 @@ namespace ShardsOfTheLimit.Tests
         }
 
         [Test]
-        public void BurningStacksDamageAndLatestApplicationResetsDuration()
+        public void BurningKeepsStrongestPowerAndLatestApplicationResetsDuration()
         {
             CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100);
-            BurnAppliedResult first = BurningCalculator.Apply(target, target.BurningState, 20, 10, 3, 0);
+            BurnAppliedResult first = BurningCalculator.Apply(target, target.BurningState, 4, 3, 0);
             CombatEffectResolver.Apply(new ICombatEffectResult[] { first });
 
-            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(2));
+            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(4));
             Assert.That(target.BurningState.RemainingPulses(), Is.EqualTo(3));
 
-            BurnAppliedResult second = BurningCalculator.Apply(target, target.BurningState, 40, 10, 3, 50);
-            CombatEffectResolver.Apply(new ICombatEffectResult[] { second });
+            BurnAppliedResult weaker = BurningCalculator.Apply(target, target.BurningState, 2, 3, 50);
+            CombatEffectResolver.Apply(new ICombatEffectResult[] { weaker });
 
-            Assert.That(second.AddedDamagePerPulse, Is.EqualTo(4));
-            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(6));
+            Assert.That(weaker.AddedDamagePerPulse, Is.EqualTo(2));
+            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(4), "Burning does not stack; strongest stays.");
             Assert.That(target.BurningState.NextPulseTick, Is.EqualTo(100));
             Assert.That(target.BurningState.ExpireTick, Is.EqualTo(350));
+
+            BurnAppliedResult stronger = BurningCalculator.Apply(target, target.BurningState, 6, 3, 60);
+            CombatEffectResolver.Apply(new ICombatEffectResult[] { stronger });
+            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(6));
+            Assert.That(BurningCalculator.PowerFromAttack(18, 0.25f), Is.EqualTo(5), "0.25 × ATK 18 = 4.5 → 5.");
+        }
+
+        [Test]
+        public void BurningConsumesOilForFiftyPercentPerStack()
+        {
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100);
+            target.ApplyStatus(StatusCalculator.Apply(target,
+                new StatusRules("OIL", 999, 300, mechanic: StatusMechanic.Oil), 2, 0, "source"));
+            Assert.That(target.AvailableMovementRange, Is.EqualTo(1));
+
+            BurnAppliedResult burn = BurningCalculator.Apply(target, target.BurningState, 4, 3, 0, target.GetStacks("OIL"));
+            CombatEffectResolver.Apply(new ICombatEffectResult[] { burn });
+
+            Assert.That(burn.ConsumedOilStacks, Is.EqualTo(2));
+            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(8), "4 × (1 + 0.5 × 2).");
+            Assert.That(target.GetStacks("OIL"), Is.Zero);
+            Assert.That(target.AvailableMovementRange, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void BurningPulseIgnoresDefenseAndRespectsBurningResistance()
+        {
+            CombatUnit target = CreateUnit(new GridCoordinate(0, 0), maximumHealth: 100, defense: 40);
+            target.SetPeriodicResistance(BurningCalculator.ResistanceId, 50);
+            CombatEffectResolver.Apply(new ICombatEffectResult[]
+            {
+                BurningCalculator.Apply(target, target.BurningState, 10, 3, 0)
+            });
+            Assert.That(target.PulseBurn(100).HealthDamage, Is.EqualTo(5));
         }
 
         [Test]
@@ -672,7 +843,7 @@ namespace ShardsOfTheLimit.Tests
                 new GridCoordinate(0, 0),
                 maximumHealth: 100,
                 maximumShield: 5);
-            BurnAppliedResult applied = BurningCalculator.Apply(target, target.BurningState, 20, 50, 3, 0);
+            BurnAppliedResult applied = BurningCalculator.Apply(target, target.BurningState, 10, 3, 0);
             CombatEffectResolver.Apply(new ICombatEffectResult[] { applied });
 
             BurnTickResult first = target.PulseBurn(100);
@@ -691,10 +862,10 @@ namespace ShardsOfTheLimit.Tests
         [Test]
         public void TimelineCanIncludeOrHideScheduledStatusPulses()
         {
-            CombatUnit fast = CreateUnit(new GridCoordinate(0, 0), initiative: 50);
-            CombatUnit burning = CreateUnit(new GridCoordinate(1, 0), initiative: 30);
+            CombatUnit fast = CreateUnit(new GridCoordinate(0, 0), speed: 50);
+            CombatUnit burning = CreateUnit(new GridCoordinate(1, 0), speed: 30);
             BurnAppliedResult applied = BurningCalculator.Apply(
-                burning, burning.BurningState, 20, 10, 3, 0);
+                burning, burning.BurningState, 3, 3, 0);
             CombatEffectResolver.Apply(new ICombatEffectResult[] { applied });
             var timeline = new TimelineCoordinator(new[] { fast, burning }, 2);
 
@@ -714,10 +885,14 @@ namespace ShardsOfTheLimit.Tests
             AbilityDefinition volley = Resources.Load<AbilityDefinition>("Prototype/Abilities/BlazeFieryVolley");
 
             Assert.That(blaze, Is.Not.Null);
-            Assert.That(blaze.MaximumHealth, Is.EqualTo(100));
-            Assert.That(blaze.MaximumShield, Is.EqualTo(40));
-            Assert.That(blaze.MovementRange, Is.EqualTo(3));
-            Assert.That(blaze.Initiative, Is.EqualTo(40));
+            Assert.That(blaze.MaximumHealth, Is.EqualTo(150), "Fire Worm I.1 card, design 2.5.");
+            Assert.That(blaze.MaximumShield, Is.EqualTo(15));
+            Assert.That(blaze.Attack, Is.EqualTo(18));
+            Assert.That(blaze.Defense, Is.EqualTo(4));
+            Assert.That(blaze.Speed, Is.EqualTo(8));
+            Assert.That(blaze.MovementRange, Is.EqualTo(2));
+            Assert.That(blaze.PeriodicResistances.Single().sourceId, Is.EqualTo("BURNING"));
+            Assert.That(blaze.PeriodicResistances.Single().percent, Is.EqualTo(50));
             Assert.That(blaze.Abilities.Count, Is.EqualTo(3));
             Assert.That(blaze.Abilities.All(ability => ability.Icon != null), Is.True);
             Assert.That(blaze.Portrait, Is.Not.Null);
@@ -742,13 +917,13 @@ namespace ShardsOfTheLimit.Tests
             AbilityResolution preview = AbilityRuntime.Preview(spit, grid, source, target.Cell, new[] { source, target });
             BurnAppliedResult burnPreview = preview.Results.OfType<BurnAppliedResult>().Single();
 
-            Assert.That(burnPreview.AddedDamagePerPulse, Is.EqualTo(2));
+            Assert.That(burnPreview.AddedDamagePerPulse, Is.EqualTo(3), "0.25 × ATK 10 = 2.5 → 3.");
             Assert.That(GetPulseCount(burnPreview), Is.EqualTo(3));
             Assert.That(target.IsBurning, Is.False, "Preview must not mutate runtime status.");
 
             AbilityRuntime.Execute(spit, grid, source, target.Cell, new[] { source, target });
             Assert.That(target.IsBurning, Is.True);
-            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(2));
+            Assert.That(target.BurningState.DamagePerPulse, Is.EqualTo(3));
             Assert.That(volley.ImpactPattern.Evaluate(grid, new GridCoordinate(3, 3)).Count, Is.EqualTo(5));
         }
 
@@ -783,19 +958,23 @@ namespace ShardsOfTheLimit.Tests
             GridCoordinate coordinate,
             int maximumHealth = 10,
             int maximumShield = 0,
-            int initiative = 10,
-            Team team = Team.Opponent)
+            int speed = 10,
+            Team team = Team.Opponent,
+            int attack = 10,
+            int defense = 0)
         {
             return new CombatUnit(
                 "test-unit",
                 "Test Unit",
                 maximumHealth,
                 maximumShield,
-                initiative,
+                speed,
                 3,
                 team,
                 ControlType.Passive,
-                coordinate);
+                coordinate,
+                attack,
+                defense);
         }
     }
 }

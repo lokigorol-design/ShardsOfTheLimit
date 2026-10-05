@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10000000000000000000000000000006, type: 3}
   m_Name: AegisShield
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.GrantShieldEffectDefinition
-  amount: 5
+  amount: 25

@@ -73,27 +73,34 @@ namespace ShardsOfTheLimit.Domain
     {
         private readonly Dictionary<string, int> cooldownReadyActivations = new Dictionary<string, int>();
 
+        private readonly Dictionary<string, int> periodicResistances = new Dictionary<string, int>();
+
         public CombatUnit(
             string definitionId,
             string displayName,
             int maximumHealth,
             int maximumShield,
-            int initiative,
+            int speed,
             int movementRange,
             Team team,
             ControlType controlType,
-            GridCoordinate cell)
+            GridCoordinate cell,
+            int attack = 0,
+            int defense = 0)
         {
             if (maximumHealth <= 0) throw new ArgumentOutOfRangeException(nameof(maximumHealth));
             if (maximumShield < 0) throw new ArgumentOutOfRangeException(nameof(maximumShield));
             if (movementRange < 0) throw new ArgumentOutOfRangeException(nameof(movementRange));
+            if (attack < 0) throw new ArgumentOutOfRangeException(nameof(attack));
 
             DefinitionId = definitionId ?? throw new ArgumentNullException(nameof(definitionId));
             DisplayName = displayName ?? definitionId;
             MaximumHealth = maximumHealth;
             MaximumShield = maximumShield;
-            Initiative = initiative;
+            Speed = speed;
             MovementRange = movementRange;
+            Attack = attack;
+            BaseDefense = defense;
             Team = team;
             ControlType = controlType;
             Cell = cell;
@@ -106,8 +113,13 @@ namespace ShardsOfTheLimit.Domain
         public string DisplayName { get; }
         public int MaximumHealth { get; }
         public int MaximumShield { get; }
-        public int Initiative { get; }
+        /// <summary>Design 2.5 Speed: activation interval is 1000 / Speed ticks.</summary>
+        public int Speed { get; }
         public int MovementRange { get; }
+        /// <summary>Design 2.5 ATK: ability damage is written as a multiplier of it.</summary>
+        public int Attack { get; }
+        /// <summary>Authored Defense before Corrosion and temporary bonuses.</summary>
+        public int BaseDefense { get; }
         public Team Team { get; }
         public ControlType ControlType { get; }
         public GridCoordinate Cell { get; private set; }
@@ -122,6 +134,26 @@ namespace ShardsOfTheLimit.Domain
         public bool IsDefeated => CurrentHealth <= 0;
 
         public void MoveTo(GridCoordinate cell) => Cell = cell;
+
+        /// <summary>Authored "Защита от периодического урона" for one source, in percent.</summary>
+        public void SetPeriodicResistance(string sourceId, int percent)
+        {
+            if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source id is empty.", nameof(sourceId));
+            periodicResistances[sourceId] = percent;
+        }
+
+        public int GetBasePeriodicResistance(string sourceId) =>
+            sourceId != null && periodicResistances.TryGetValue(sourceId, out int value) ? value : 0;
+
+        /// <summary>Corrosion removes 10 percentage points per stack and may go negative.</summary>
+        public int GetPeriodicResistance(string sourceId) =>
+            Math.Min(100, GetBasePeriodicResistance(sourceId) -
+                          StatusMechanicRules.CorrosionResistancePenalty * GetMechanicStacks(StatusMechanic.Corrosion));
+
+        /// <summary>Corrosion removes 10% of base Defense per stack and may go negative.</summary>
+        public double EffectiveDefense =>
+            BaseDefense * (1d - StatusMechanicRules.CorrosionDefenseFraction * GetMechanicStacks(StatusMechanic.Corrosion)) +
+            DefenseBonus;
         public int GetCooldown(string abilityId) => cooldownReadyActivations.TryGetValue(abilityId, out int readyAt)
             ? Math.Max(0, readyAt - ActivationCount)
             : 0;
@@ -178,6 +210,7 @@ namespace ShardsOfTheLimit.Domain
             if (result == null) throw new ArgumentNullException(nameof(result));
             if (result.Target != this) throw new InvalidOperationException("Burn result targets another unit.");
             BurningState = new BurningState(result.NewDamagePerPulse, result.NewNextPulseTick, result.NewExpireTick);
+            if (result.ConsumedOilStacks > 0) RemoveMechanic(StatusMechanic.Oil);
         }
     }
 
@@ -232,15 +265,19 @@ namespace ShardsOfTheLimit.Domain
 
     public sealed class PushResult : ICombatEffectResult
     {
-        public PushResult(CombatUnit target, IReadOnlyList<GridCoordinate> path)
+        public PushResult(CombatUnit target, IReadOnlyList<GridCoordinate> path, GridCoordinate? collisionCell = null)
         {
             Target = target ?? throw new ArgumentNullException(nameof(target));
             Path = path ?? throw new ArgumentNullException(nameof(path));
             if (path.Count == 0) throw new ArgumentException("Push path must contain its origin.", nameof(path));
+            CollisionCell = collisionCell;
         }
 
         public CombatUnit Target { get; }
         public IReadOnlyList<GridCoordinate> Path { get; }
+        /// <summary>Cell that stopped the displacement early (unit, obstacle or terrain); null when it was not blocked.</summary>
+        public GridCoordinate? CollisionCell { get; }
+        public bool Collided => CollisionCell.HasValue;
         public GridCoordinate Origin => Path[0];
         public GridCoordinate Destination => Path[Path.Count - 1];
         public int StepsMoved => Math.Max(0, Path.Count - 1);
@@ -257,7 +294,8 @@ namespace ShardsOfTheLimit.Domain
             int previousDamagePerPulse,
             int newDamagePerPulse,
             long newNextPulseTick,
-            long newExpireTick)
+            long newExpireTick,
+            int consumedOilStacks = 0)
         {
             Target = target ?? throw new ArgumentNullException(nameof(target));
             AddedDamagePerPulse = addedDamagePerPulse;
@@ -265,10 +303,14 @@ namespace ShardsOfTheLimit.Domain
             NewDamagePerPulse = newDamagePerPulse;
             NewNextPulseTick = newNextPulseTick;
             NewExpireTick = newExpireTick;
+            ConsumedOilStacks = consumedOilStacks;
         }
 
         public CombatUnit Target { get; }
+        /// <summary>Power of this application (after Oil), before Burning resistance.</summary>
         public int AddedDamagePerPulse { get; }
+        /// <summary>Oil stacks burned away by this application (+50% power each).</summary>
+        public int ConsumedOilStacks { get; }
         public int PreviousDamagePerPulse { get; }
         public int NewDamagePerPulse { get; }
         public long NewNextPulseTick { get; }
@@ -442,10 +484,27 @@ namespace ShardsOfTheLimit.Domain
     /// <summary>Pure resource math shared by ability preview and execution.</summary>
     public static class CombatEffectCalculator
     {
-        public static DamageResult Damage(CombatUnit target, CombatResourceState state, int amount)
+        /// <summary>A direct hit of raw strength <paramref name="amount"/>: Defense, then Vulnerability, then shield-first.</summary>
+        public static DamageResult Damage(CombatUnit target, CombatResourceState state, double amount)
         {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            int applied = Math.Max(0, amount - target.DefenseBonus);
+            double afterDefense = DefenseFormula.Apply(amount, target.EffectiveDefense);
+            if (afterDefense > 0 && target.GetMechanicStacks(StatusMechanic.Vulnerability) > 0)
+                afterDefense *= StatusMechanicRules.VulnerabilityMultiplier;
+            return Absorb(target, state, afterDefense <= 0 ? 0 : Math.Max(1, DefenseFormula.Round(afterDefense)));
+        }
+
+        /// <summary>Periodic damage (Burning, Poison, Magma): ignores Defense, reduced by the per-source resistance.</summary>
+        public static DamageResult PeriodicDamage(CombatUnit target, CombatResourceState state, double amount, string sourceId)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            if (amount <= 0) return Absorb(target, state, 0);
+            double scaled = amount * (100 - target.GetPeriodicResistance(sourceId)) / 100d;
+            return Absorb(target, state, scaled <= 0 ? 0 : Math.Max(1, DefenseFormula.Round(scaled)));
+        }
+
+        private static DamageResult Absorb(CombatUnit target, CombatResourceState state, int applied)
+        {
             int shieldDamage = Math.Min(state.Shield, applied);
             int healthDamage = Math.Min(state.Health, applied - shieldDamage);
             return new DamageResult(target, shieldDamage, healthDamage, state.Health - healthDamage <= 0);
@@ -474,40 +533,65 @@ namespace ShardsOfTheLimit.Domain
         }
     }
 
-    /// <summary>Pure stacking and ticking rules for the first content status.</summary>
+    /// <summary>Design 2.5 direct-hit Defense: damage = A² / (A + Defense), denominator at least 0.25 × A.</summary>
+    public static class DefenseFormula
+    {
+        public const double MinimumDenominatorFraction = 0.25d;
+
+        public static double Apply(double rawDamage, double defense)
+        {
+            if (rawDamage <= 0) return 0;
+            double denominator = Math.Max(rawDamage + defense, MinimumDenominatorFraction * rawDamage);
+            return rawDamage * rawDamage / denominator;
+        }
+
+        public static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>Design 2.5 Burning: 0.25 × source ATK every 100 ticks for 3 turns; strongest wins, no stacking.</summary>
     public static class BurningCalculator
     {
         public const int DefaultPulseInterval = 100;
+        public const string ResistanceId = "BURNING";
+        public const double OilBonusPerStack = 0.5d;
 
+        /// <param name="power">Pulse power of this application before Oil and resistance.</param>
+        /// <param name="oilStacks">Oil stacks on the target; all are consumed for +50% power each.</param>
         public static BurnAppliedResult Apply(
             CombatUnit target,
             BurningState current,
-            int sourceDamage,
-            int percentage,
+            int power,
             int durationInPulses,
             long currentTick,
+            int oilStacks = 0,
             int pulseInterval = DefaultPulseInterval)
         {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            if (sourceDamage < 0) throw new ArgumentOutOfRangeException(nameof(sourceDamage));
-            if (percentage < 0) throw new ArgumentOutOfRangeException(nameof(percentage));
+            if (power < 0) throw new ArgumentOutOfRangeException(nameof(power));
             if (durationInPulses <= 0) throw new ArgumentOutOfRangeException(nameof(durationInPulses));
             if (currentTick < 0) throw new ArgumentOutOfRangeException(nameof(currentTick));
             if (pulseInterval <= 0) throw new ArgumentOutOfRangeException(nameof(pulseInterval));
+            if (oilStacks < 0) throw new ArgumentOutOfRangeException(nameof(oilStacks));
 
-            int addedDamage = sourceDamage == 0 || percentage == 0
+            int consumedOil = power > 0 ? oilStacks : 0;
+            int appliedPower = power == 0
                 ? 0
-                : Math.Max(1, (int)Math.Ceiling(sourceDamage * percentage / 100d));
+                : DefenseFormula.Round(power * (1d + OilBonusPerStack * consumedOil));
+            int previous = current.IsActive ? current.DamagePerPulse : 0;
             return new BurnAppliedResult(
                 target,
-                addedDamage,
-                current.DamagePerPulse,
-                current.DamagePerPulse + addedDamage,
+                appliedPower,
+                previous,
+                Math.Max(previous, appliedPower),
                 current.IsActive && current.NextPulseTick > currentTick
                     ? current.NextPulseTick
                     : currentTick + pulseInterval,
-                currentTick + (long)durationInPulses * pulseInterval);
+                currentTick + (long)durationInPulses * pulseInterval,
+                consumedOil);
         }
+
+        public static int PowerFromAttack(int attack, float attackMultiplier) =>
+            attack <= 0 || attackMultiplier <= 0 ? 0 : Math.Max(1, DefenseFormula.Round(attack * (double)attackMultiplier));
 
         public static BurnTickResult Tick(
             CombatUnit target,
@@ -521,7 +605,8 @@ namespace ShardsOfTheLimit.Domain
             if (timelineTick != burning.NextPulseTick)
                 throw new InvalidOperationException("Burn can only pulse at its scheduled timeline tick.");
             if (pulseInterval <= 0) throw new ArgumentOutOfRangeException(nameof(pulseInterval));
-            DamageResult damage = CombatEffectCalculator.Damage(target, resources, burning.DamagePerPulse);
+            DamageResult damage = CombatEffectCalculator.PeriodicDamage(
+                target, resources, burning.DamagePerPulse, ResistanceId);
             return new BurnTickResult(
                 target,
                 damage.ShieldDamage,

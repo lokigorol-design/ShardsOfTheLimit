@@ -16,10 +16,13 @@ MonoBehaviour:
   displayName: Crimson Brute
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
-  maximumHealth: 26
-  maximumShield: 6
-  initiative: 8
+  maximumHealth: 140
+  maximumShield: 50
+  attack: 19
+  defense: 5
+  speed: 8
   movementRange: 3
+  periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b1111111111111111111111111111111, type: 2}
   - {fileID: 11400000, guid: b2222222222222222222222222222222, type: 2}

@@ -47,7 +47,7 @@ namespace ShardsOfTheLimit.Presentation
         private const float CellSpacing = 1.05f;
         private const float HeightStep = 0.55f;
         private const int ActionsPerTurn = 2;
-        private const float DefaultCameraZoom = 7.7f;
+        private const float DefaultCameraZoom = 9.2f;
         private const float MinimumCameraZoom = 4.25f;
         private const float MaximumCameraZoom = 11.5f;
         private const float CameraZoomStep = 0.8f;

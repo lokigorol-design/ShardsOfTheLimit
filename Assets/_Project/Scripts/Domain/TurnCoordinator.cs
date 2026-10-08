@@ -34,10 +34,10 @@ namespace ShardsOfTheLimit.Domain
         public const int MinimumInterval = 30;
         public const int MaximumInterval = 200;
 
-        public static int GetInterval(int speed)
+        public static int GetInterval(double speed)
         {
             if (speed <= 0) return MaximumInterval;
-            int interval = (int)Math.Round(SpeedNumerator / (double)speed, MidpointRounding.AwayFromZero);
+            int interval = (int)Math.Round(SpeedNumerator / speed, MidpointRounding.AwayFromZero);
             return Math.Max(MinimumInterval, Math.Min(MaximumInterval, interval));
         }
     }
@@ -66,7 +66,7 @@ namespace ShardsOfTheLimit.Domain
                 .ToDictionary(entry => entry.unit, entry => entry.index);
             nextActivationTicks = this.units.ToDictionary(
                 unit => unit,
-                unit => (long)SpeedTimeline.GetInterval(unit.Speed));
+                unit => (long)SpeedTimeline.GetInterval(unit.EffectiveSpeed));
         }
 
         public long CurrentTick { get; private set; }
@@ -88,7 +88,7 @@ namespace ShardsOfTheLimit.Domain
             if (!started || CurrentUnit == null)
                 throw new InvalidOperationException("StartBattle must be called before advancing the timeline.");
 
-            nextActivationTicks[CurrentUnit] = CurrentTick + SpeedTimeline.GetInterval(CurrentUnit.Speed);
+            nextActivationTicks[CurrentUnit] = CurrentTick + SpeedTimeline.GetInterval(CurrentUnit.EffectiveSpeed);
             CurrentUnit = null;
             var statusResults = new List<ICombatEffectResult>();
 
@@ -152,7 +152,7 @@ namespace ShardsOfTheLimit.Domain
                 .ToDictionary(entry => entry.Key, entry => entry.Value);
             if (CurrentUnit != null && !CurrentUnit.IsDefeated)
             {
-                activations[CurrentUnit] = CurrentTick + SpeedTimeline.GetInterval(CurrentUnit.Speed);
+                activations[CurrentUnit] = CurrentTick + SpeedTimeline.GetInterval(CurrentUnit.EffectiveSpeed);
             }
 
             var statusTicks = includeStatusEvents
@@ -164,7 +164,7 @@ namespace ShardsOfTheLimit.Domain
             {
                 CombatUnit activationUnit = activations.Keys
                     .OrderBy(unit => activations[unit])
-                    .ThenByDescending(unit => unit.Speed)
+                    .ThenByDescending(unit => unit.EffectiveSpeed)
                     .ThenBy(unit => stableOrder[unit])
                     .First();
                 long activationTick = activations[activationUnit];
@@ -189,7 +189,7 @@ namespace ShardsOfTheLimit.Domain
                 }
 
                 result.Add(new TimelineEvent(activationTick, TimelineEventKind.Activation, activationUnit));
-                activations[activationUnit] = activationTick + SpeedTimeline.GetInterval(activationUnit.Speed);
+                activations[activationUnit] = activationTick + SpeedTimeline.GetInterval(activationUnit.EffectiveSpeed);
             }
 
             if (includeStatusEvents && AreaEffects != null)
@@ -214,7 +214,7 @@ namespace ShardsOfTheLimit.Domain
             return units
                 .Where(unit => !unit.IsDefeated)
                 .OrderBy(unit => nextActivationTicks[unit])
-                .ThenByDescending(unit => unit.Speed)
+                .ThenByDescending(unit => unit.EffectiveSpeed)
                 .ThenBy(unit => stableOrder[unit])
                 .FirstOrDefault();
         }

@@ -23,6 +23,8 @@ namespace ShardsOfTheLimit.Tests
         [UnityTest]
         public IEnumerator MainBattlePlaysToadAndWormEffects()
         {
+            BattlePrototypeController.SetBranchVariant("primal-idol", 0);
+            BattlePrototypeController.SetBranchVariant("blaze-worm", 0);
             SceneManager.LoadScene("Assets/_Project/Scenes/PrototypeBattle.unity");
             yield return null;
             yield return null;
@@ -45,7 +47,7 @@ namespace ShardsOfTheLimit.Tests
             Call(controller, "ConfirmCurrentChoice");
             yield return new WaitForSeconds(1.2f);
             yield return Capture("01b-idol-geyser-mark.png");
-            Assert.That(controller.AreaEffects.PendingStrikes.Count, Is.EqualTo(1));
+            Assert.That(controller.AreaEffects.PendingStrikes.Count, Is.EqualTo(2), "Twin Eruption: the geyser erupts again 2 turns later.");
             // Both AP spent: the turn stops at the facing step until the player confirms a direction.
             yield return new WaitForSeconds(0.8f);
             Assert.That(controller.ActiveUnit, Is.SameAs(idol), "The facing step waits for the player.");

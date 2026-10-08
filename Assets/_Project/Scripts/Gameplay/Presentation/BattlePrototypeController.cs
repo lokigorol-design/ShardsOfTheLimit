@@ -203,6 +203,7 @@ namespace ShardsOfTheLimit.Presentation
 
             UpdateCameraControls();
             EmitFieldMarks();
+            EmitResonantMarks();
 
             if (showOnboarding)
             {
@@ -250,6 +251,9 @@ namespace ShardsOfTheLimit.Presentation
             {
                 EndPlayerTurn();
             }
+
+            if (Input.GetKeyDown(KeyCode.Tab)) ToggleWallMode();
+            if (Input.GetKeyDown(KeyCode.B)) CycleBranchVariant();
 
             UpdatePointer();
         }
@@ -335,22 +339,25 @@ namespace ShardsOfTheLimit.Presentation
             GridCoordinate coordinate,
             Color fallbackColor)
         {
+            PassiveModifierDefinition modifiers = ChooseVariant(definition);
+            ScaleStats(definition, modifiers, out int health, out int attack, out int defense, out int movement);
             var unit = new CombatUnit(
                 definition.StableId,
                 definition.DisplayName,
-                definition.MaximumHealth,
+                health,
                 definition.MaximumShield,
                 definition.Speed,
-                definition.MovementRange,
+                movement,
                 team,
                 controlType,
                 coordinate,
-                definition.Attack,
-                definition.Defense);
+                attack,
+                defense);
             unit.ConfigureMovement(definition.MovementMode, definition.MovementActionCost);
             foreach (PeriodicResistance resistance in definition.PeriodicResistances)
                 if (!string.IsNullOrWhiteSpace(resistance.sourceId))
                     unit.SetPeriodicResistance(resistance.sourceId, resistance.percent);
+            ConfigureBranch(unit, definition, modifiers);
             units.Add(unit);
             definitionsByUnit.Add(unit, definition);
 
@@ -461,7 +468,7 @@ namespace ShardsOfTheLimit.Presentation
 
                 selectedAbilityTarget = coordinate;
                 abilityPreview = AbilityRuntime.Preview(
-                    ability, grid, selectedUnit, coordinate, units, turns.CurrentTick, areaEffects, definitionsByUnit[selectedUnit].PassiveModifiers);
+                    ability, grid, selectedUnit, coordinate, units, turns.CurrentTick, areaEffects, ModifiersOf(selectedUnit), wallMode);
                 previewImpact = abilityPreview.ImpactCells;
                 selectedUnit.CurrentAction = $"Previewing {ability.DisplayName} at {coordinate}";
                 status = $"Orange cells show impact. {BuildAbilitySummary(abilityPreview, true)} Confirm with Enter.";
@@ -544,9 +551,16 @@ namespace ShardsOfTheLimit.Presentation
                 return;
             }
 
-            if (selectedUnit.CurrentActionPoints < ability.ActionCost)
+            string channelBlock = ChannelBlockReason(selectedUnit, ability);
+            if (channelBlock != null)
             {
-                status = $"{ability.DisplayName} needs {ability.ActionCost} action point(s).";
+                status = channelBlock;
+                return;
+            }
+
+            if (selectedUnit.CurrentActionPoints < AbilityCost(selectedUnit, ability))
+            {
+                status = $"{ability.DisplayName} needs {AbilityCost(selectedUnit, ability)} action point(s).";
                 return;
             }
 
@@ -556,10 +570,19 @@ namespace ShardsOfTheLimit.Presentation
             selectedAbilityTarget = null;
             previewImpact = Array.Empty<GridCoordinate>();
             abilityPreview = null;
-            targetable = AbilityRuntime.GetTargetableCells(ability, grid, selectedUnit, units);
-            targetingRange = AbilityRuntime.GetTargetingHighlightCells(ability, grid, selectedUnit, units);
+            bool onWall = wallMode && AbilityRuntime.IsSurfaceAbility(ability);
+            targetable = AbilityRuntime.GetTargetableCells(ability, grid, selectedUnit, units, onWall);
+            targetingRange = AbilityRuntime.GetTargetingHighlightCells(ability, grid, selectedUnit, units, onWall);
             selectedUnit.CurrentAction = $"Choosing target for {ability.DisplayName}";
-            status = $"{ability.RangeType}: dark green shows full range; bright green cells are valid targets.";
+            status = ChannelOf(ability) != null
+                ? IsExtending(selectedUnit, ability)
+                    ? $"Продлить {ability.DisplayName} за {AbilityCost(selectedUnit, ability)} ОД: выбери клетку конуса."
+                    : $"{ability.DisplayName}: выбери соседнюю клетку — направление конуса."
+                : onWall
+                    ? "Стена: зелёные клетки — стены, обращённые к тотему; эффект выходит в клетку перед стеной. Tab — пол."
+                    : AbilityRuntime.IsSurfaceAbility(ability)
+                        ? $"{ability.RangeType}: пол. Tab — переключить на стену."
+                        : $"{ability.RangeType}: dark green shows full range; bright green cells are valid targets.";
             RefreshHighlights();
         }
 
@@ -592,6 +615,7 @@ namespace ShardsOfTheLimit.Presentation
                 $"{selectedUnit.DisplayName} moves {start} → {path[path.Count - 1]} " +
                 $"({movementCost}/{MovementBudget(selectedUnit)} movement, -{selectedUnit.MovementActionCost} AP)");
             yield return AnimateMovement(selectedUnit, path);
+            yield return EnterCells(selectedUnit, path.Skip(1).ToArray(), true);
             yield return TriggerTrapIfAny(selectedUnit, new[] { selectedUnit.Cell });
             if (EvaluateBattleEnd()) yield break;
 
@@ -623,14 +647,16 @@ namespace ShardsOfTheLimit.Presentation
                 yield break;
             }
 
-            if (!selectedUnit.SpendActionPoints(ability.ActionCost))
+            int cost = AbilityCost(selectedUnit, ability);
+            if (!selectedUnit.SpendActionPoints(cost))
             {
                 status = "Not enough action points for this ability.";
                 yield break;
             }
 
             GridCoordinate target = selectedAbilityTarget.Value;
-            IReadOnlyCollection<GridCoordinate> actualImpact = AbilityRuntime.GetImpactCells(ability, grid, target);
+            IReadOnlyCollection<GridCoordinate> actualImpact = AbilityRuntime.GetImpactCells(ability, grid, target,
+                selectedUnit, wallMode, ModifiersOf(selectedUnit));
             if (!new HashSet<GridCoordinate>(previewImpact).SetEquals(actualImpact))
             {
                 throw new InvalidOperationException("Ability preview diverged from execution impact cells.");
@@ -639,7 +665,7 @@ namespace ShardsOfTheLimit.Presentation
             isBusy = true;
             selectedUnit.CurrentAction = $"Casting {ability.DisplayName}";
             status = $"{selectedUnit.DisplayName} launches {ability.DisplayName}...";
-            feedback.AddLog($"{selectedUnit.DisplayName} casts {ability.DisplayName} at {target} (-{ability.ActionCost} AP)");
+            feedback.AddLog($"{selectedUnit.DisplayName} casts {ability.DisplayName} at {target} (-{cost} AP)");
             FaceTowards(selectedUnit, selectedUnit.Cell, target);
             yield return PlayAbilityVisual(selectedUnit, ability, target, actualImpact);
 
@@ -667,11 +693,11 @@ namespace ShardsOfTheLimit.Presentation
             AbilityDefinition ability,
             GridCoordinate target)
         {
+            bool onWall = source.ControlType == ControlType.Player && wallMode;
             AbilityResolution resolution = AbilityRuntime.Execute(
-                ability, grid, source, target, units, turns.CurrentTick, areaEffects, definitionsByUnit[source].PassiveModifiers);
-            source.SetCooldown(ability.StableId, ability.Cooldown);
+                ability, grid, source, target, units, turns.CurrentTick, areaEffects, ModifiersOf(source), onWall);
+            ApplyCooldown(source, ability, resolution);
             source.CurrentAction = $"Used {ability.DisplayName}";
-            feedback.AddLog($"{ability.DisplayName} cooldown set to {ability.Cooldown}");
             return resolution;
         }
 
@@ -788,7 +814,8 @@ namespace ShardsOfTheLimit.Presentation
 
         private void RefreshMovementOptions(CombatUnit unit)
         {
-            if (unit != null && !unit.IsDefeated && unit.CurrentActionPoints >= unit.MovementActionCost)
+            // While a channel is held the resonant cannot move.
+            if (unit != null && !unit.IsDefeated && unit.Channel == null && unit.CurrentActionPoints >= unit.MovementActionCost)
             {
                 movementMap = MovementRules.BuildMap(grid, unit, IsOccupied);
                 reachable = movementMap.ReachableCosts;

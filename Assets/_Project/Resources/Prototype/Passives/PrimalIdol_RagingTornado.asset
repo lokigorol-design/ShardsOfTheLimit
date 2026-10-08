@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b336873bfd20a3d4f8eaa9147a999de3, type: 3}
+  m_Name: PrimalIdol_RagingTornado
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
+  variantName: "Primal Idol \xB7 Raging Tornado"
+  healthMultiplier: 0.95
+  attackMultiplier: 1
+  defenseMultiplier: 1
+  speedBonus: 0
+  movementBonus: 1
+  nativeMire: 0
+  nativeMireHealPercent: 5
+  toxicCocktail: 0
+  cloudStacksMultiplier: 2
+  cloudStacksBonus: 0
+  stickyMud: 0
+  modifiedAbility: {fileID: 0}
+  stickyMudStatus: {fileID: 0}
+  magmaWorm: 0
+  bankedHeat: 0
+  roaringFurnace: 0
+  bloodOfTheDeep: 0
+  bloodOfTheDeepHealPercent: 8
+  twinEruption: 0
+  stormOvercharge: 0
+  titanPillar: 0
+  ragingTornado: 1

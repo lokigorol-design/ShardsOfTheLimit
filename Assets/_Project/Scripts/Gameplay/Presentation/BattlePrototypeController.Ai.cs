@@ -38,7 +38,7 @@ namespace ShardsOfTheLimit.Presentation
             bool seekOwnCloud = areaEffects.GetModifiers(unit).NativeMire && !areaEffects.IsInsideAnyCloud(unit.Cell) &&
                 MovementRules.BuildMap(grid,unit,IsOccupied).ReachableCosts.Keys
                     .Any(c => areaEffects.IsInsideAnyCloud(c));
-            if ((!canAttack || seekOwnCloud) && unit.CurrentActionPoints >= unit.MovementActionCost)
+            if ((!canAttack || seekOwnCloud) && unit.Channel == null && unit.CurrentActionPoints >= unit.MovementActionCost)
             {
                 MovementMap aiMovementMap = MovementRules.BuildMap(grid, unit, IsOccupied);
 
@@ -64,6 +64,7 @@ namespace ShardsOfTheLimit.Presentation
                             $"({movementCost}/{MovementBudget(unit)} movement, -{unit.MovementActionCost} AP)");
                         RefreshHighlights();
                         yield return AnimateMovement(unit, path);
+                        yield return EnterCells(unit, path.Skip(1).ToArray(), true);
                         yield return TriggerTrapIfAny(unit, new[] { unit.Cell });
                         if (EvaluateBattleEnd()) yield break;
                         resolvedActions++;
@@ -74,19 +75,19 @@ namespace ShardsOfTheLimit.Presentation
                 }
             }
 
-            if (canAttack && unit.GetCooldown(ability.StableId) == 0 &&
-                unit.CurrentActionPoints >= ability.ActionCost && unit.SpendActionPoints(ability.ActionCost))
+            int abilityCost = canAttack ? AbilityCost(unit, ability) : 0;
+            if (canAttack && CanUseAbility(unit, ability) && unit.SpendActionPoints(abilityCost))
             {
                 mode = InteractionMode.AbilityTargeting;
                 selectedAbilityTarget = abilityTarget;
                 targetable = AbilityRuntime.GetTargetableCells(ability, grid, unit, units);
                 targetingRange = AbilityRuntime.GetTargetingHighlightCells(ability, grid, unit, units);
                 abilityPreview = AbilityRuntime.Preview(
-                    ability, grid, unit, abilityTarget, units, turns.CurrentTick, areaEffects, definitionsByUnit[unit].PassiveModifiers);
+                    ability, grid, unit, abilityTarget, units, turns.CurrentTick, areaEffects, ModifiersOf(unit));
                 previewImpact = abilityPreview.ImpactCells;
                 unit.CurrentAction = $"Targeting {ability.DisplayName}";
                 status = $"{unit.DisplayName} previews {ability.DisplayName}.";
-                feedback.AddLog($"{unit.DisplayName} casts {ability.DisplayName} at {abilityTarget} (-{ability.ActionCost} AP)");
+                feedback.AddLog($"{unit.DisplayName} casts {ability.DisplayName} at {abilityTarget} (-{abilityCost} AP)");
                 RefreshHighlights();
                 yield return new WaitForSeconds(0.35f);
                 FaceTowards(unit, unit.Cell, abilityTarget);
@@ -114,6 +115,7 @@ namespace ShardsOfTheLimit.Presentation
             unit.CurrentAction = "Turn complete";
             feedback.AddLog($"{unit.DisplayName} ends the turn");
             aiDecisionRolls.Remove(unit);
+            FinishActivation(unit);
             isBusy = false;
             AdvanceTurn();
         }
@@ -133,7 +135,8 @@ namespace ShardsOfTheLimit.Presentation
             var plans = new List<AiAbilityPlan>();
             foreach (AbilityDefinition ability in definition.Abilities)
             {
-                if (source.GetCooldown(ability.StableId) > 0 || availableActionPoints < ability.ActionCost)
+                if (source.GetCooldown(ability.StableId) > 0 || availableActionPoints < AbilityCost(source, ability) ||
+                    ChannelBlockReason(source, ability) != null)
                 {
                     continue;
                 }
@@ -141,7 +144,7 @@ namespace ShardsOfTheLimit.Presentation
                 foreach (GridCoordinate candidate in AbilityRuntime.GetTargetableCells(ability, grid, source, units))
                 {
                     AbilityResolution preview = AbilityRuntime.Preview(
-                        ability, grid, source, candidate, units, turns.CurrentTick, areaEffects, definition.PassiveModifiers);
+                        ability, grid, source, candidate, units, turns.CurrentTick, areaEffects, ModifiersOf(source));
                     int damageValue = preview.Results
                         .Where(result => result.Kind == CombatEffectKind.Damage)
                         .Sum(result => (result.Target.Team == source.Team ? -1 : 1) *

@@ -81,9 +81,11 @@ namespace ShardsOfTheLimit.Domain
         /// <summary>Native Mire (2.5): immune to negative effects of any cloud; heals at turn start while inside one.</summary>
         public bool NativeMire { get; }
         public int HealPercentPerActivation { get; }
-        public PassiveModifiers(float multiplier = 1, int bonus = 0, bool nativeMire = false, int healPercent = 0)
+        /// <summary>Blood of the Deep (Magma Worm IV): heal this % of maximum health at turn start while standing on Magma.</summary>
+        public int MagmaHealPercent { get; }
+        public PassiveModifiers(float multiplier = 1, int bonus = 0, bool nativeMire = false, int healPercent = 0, int magmaHealPercent = 0)
         { CloudStacksMultiplier = Math.Max(0, multiplier); CloudStacksBonus = bonus; NativeMire = nativeMire;
-          HealPercentPerActivation = Math.Max(0, healPercent); }
+          HealPercentPerActivation = Math.Max(0, healPercent); MagmaHealPercent = Math.Max(0, magmaHealPercent); }
         public int ApplyStacks(int amount) => Math.Max(1, (int)Math.Ceiling(amount * CloudStacksMultiplier) + CloudStacksBonus);
     }
 
@@ -117,20 +119,59 @@ namespace ShardsOfTheLimit.Domain
     /// <summary>Trap object (tag «Ловушка», e.g. Lift Trap): fires on the first resonant entering its cell, allies included.</summary>
     public sealed class TrapObject
     {
-        public TrapObject(CombatUnit owner, string sourceAbilityId, GridCoordinate cell, long expireTick, int fallHealthPercent)
+        public TrapObject(CombatUnit owner, string sourceAbilityId, GridCoordinate cell, long expireTick, int fallHealthPercent,
+            GridCoordinate? pushDirection = null, int pushDistance = 0)
         {
             Owner = owner ?? throw new ArgumentNullException(nameof(owner));
             SourceAbilityId = sourceAbilityId;
             Cell = cell;
             ExpireTick = expireTick;
             FallHealthPercent = Math.Max(0, fallHealthPercent);
+            PushDirection = pushDirection;
+            PushDistance = Math.Max(0, pushDistance);
         }
+
+        /// <summary>Wall trap: pushes the victim away from the wall instead of throwing it up.</summary>
+        public GridCoordinate? PushDirection { get; }
+        public int PushDistance { get; }
 
         public CombatUnit Owner { get; }
         public string SourceAbilityId { get; }
         public GridCoordinate Cell { get; }
         public long ExpireTick { get; }
         public int FallHealthPercent { get; }
+    }
+
+    /// <summary>
+    /// Magma (16.10.8): a field object dealing 0,25 × creator ATK on entry and every 100 ticks on its cell for 3 turns;
+    /// at most 12 cells per creator, the oldest disappear first. Periodic damage, reduced by Magma resistance.
+    /// </summary>
+    public sealed class MagmaCell
+    {
+        public MagmaCell(CombatUnit owner, GridCoordinate cell, long createdTick, int lifetime, int power)
+        {
+            Owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            Cell = cell;
+            CreatedTick = createdTick;
+            ExpireTick = createdTick + lifetime;
+            NextPulseTick = createdTick + 100;
+            Power = Math.Max(0, power);
+        }
+
+        public CombatUnit Owner { get; }
+        public GridCoordinate Cell { get; }
+        public long CreatedTick { get; }
+        public long ExpireTick { get; }
+        public long NextPulseTick { get; internal set; }
+        public int Power { get; }
+    }
+
+    public sealed class TrapTrigger
+    {
+        public TrapTrigger(TrapObject trap) => Trap = trap;
+        public TrapObject Trap { get; }
+        public PushResult Push { get; internal set; }
+        public List<DamageResult> Damage { get; } = new List<DamageResult>();
     }
 
     /// <summary>Battle-owned areas and global stack statuses. Scheduled by the existing timeline.</summary>
@@ -155,6 +196,33 @@ namespace ShardsOfTheLimit.Domain
 
         public TrapObject TrapAt(GridCoordinate cell) => traps.FirstOrDefault(trap => trap.Cell == cell);
 
+        public const string MagmaResistanceId = "MAGMA";
+        public const int MaximumMagmaPerCreator = 12;
+        private readonly List<MagmaCell> magma = new List<MagmaCell>();
+        public IReadOnlyList<MagmaCell> Magma => magma;
+        public MagmaCell MagmaAt(GridCoordinate cell) => magma.FirstOrDefault(m => m.Cell == cell);
+
+        /// <summary>Creates (or refreshes) Magma on a cell; a creator keeps at most 12 cells.</summary>
+        public MagmaCell AddMagma(CombatUnit owner, GridCoordinate cell, long tick, int power, int lifetime = 300)
+        {
+            magma.RemoveAll(existing => existing.Cell == cell);
+            var created = new MagmaCell(owner, cell, tick, lifetime, power);
+            magma.Add(created);
+            List<MagmaCell> own = magma.Where(m => m.Owner == owner).OrderBy(m => m.CreatedTick).ToList();
+            for (int index = 0; index < own.Count - MaximumMagmaPerCreator; index++) magma.Remove(own[index]);
+            return created;
+        }
+
+        /// <summary>A resonant enters a Magma cell (walking, forced or landing).</summary>
+        public DamageResult EnterMagma(CombatUnit unit, GridCoordinate cell)
+        {
+            MagmaCell hot = MagmaAt(cell);
+            if (hot == null || unit == null || unit.IsDefeated) return null;
+            DamageResult burn = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState, hot.Power, MagmaResistanceId);
+            CombatEffectResolver.Apply(new[] { burn });
+            return burn;
+        }
+
         /// <summary>Strikes that fired since the last call, for presentation.</summary>
         public IReadOnlyList<DelayedStrike> TakeFiredStrikes()
         {
@@ -164,18 +232,45 @@ namespace ShardsOfTheLimit.Domain
         }
 
         /// <summary>
-        /// A resonant entered a trapped cell: the trap is spent. A floor Lift Trap throws it up 4 units;
-        /// the fall costs <see cref="TrapObject.FallHealthPercent"/>% of maximum health, Defense does not apply.
+        /// A resonant entered a trapped cell: the trap is spent. A floor Lift Trap throws it up (the fall costs
+        /// <see cref="TrapObject.FallHealthPercent"/>% of maximum health, Defense does not apply); a wall trap pushes it
+        /// away from the wall, with collision damage if something stops it.
         /// </summary>
-        public DamageResult TriggerTrap(CombatUnit unit, GridCoordinate cell)
+        public TrapTrigger TriggerTrap(CombatUnit unit, GridCoordinate cell)
         {
             TrapObject trap = TrapAt(cell);
             if (trap == null || unit == null || unit.IsDefeated) return null;
             traps.Remove(trap);
+            var trigger = new TrapTrigger(trap);
+            if (trap.PushDirection.HasValue)
+            {
+                GridCoordinate direction = trap.PushDirection.Value;
+                var from = new GridCoordinate(cell.X - direction.X, cell.Y - direction.Y);
+                PushResult push = ForcedMovementCalculator.Push(grid, unit, from, cell, trap.PushDistance,
+                    next => units.Any(other => other != unit && !other.IsDefeated && other.Cell == next));
+                CombatEffectResolver.Apply(new ICombatEffectResult[] { push });
+                trigger.Push = push;
+                if (push.Collided)
+                {
+                    double raw = trap.Owner.Attack * ForcedMovementCalculator.CollisionAttackMultiplier;
+                    CombatUnit struck = units.FirstOrDefault(other => other != unit && !other.IsDefeated && other.Cell == push.CollisionCell.Value);
+                    foreach (CombatUnit victim in new[] { unit, struck })
+                    {
+                        if (victim == null || raw <= 0) continue;
+                        DamageResult hit = CombatEffectCalculator.Damage(victim, victim.ResourceState, raw);
+                        CombatEffectResolver.Apply(new[] { hit });
+                        trigger.Damage.Add(hit);
+                    }
+                }
+
+                return trigger;
+            }
+
             DamageResult fall = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState,
                 unit.MaximumHealth * trap.FallHealthPercent / 100d, FallResistanceId);
             CombatEffectResolver.Apply(new[] { fall });
-            return fall;
+            trigger.Damage.Add(fall);
+            return trigger;
         }
 
         public const string FallResistanceId = "FALL";
@@ -193,6 +288,7 @@ namespace ShardsOfTheLimit.Domain
         public void Add(CloudAreaEffect cloud) { clouds.Add(cloud); }
         public long NextEventTick => clouds.SelectMany(c => new[] { c.NextPulseTick, c.NextMoveTick, c.ExpireTick })
             .Concat(strikes.Select(s => s.StrikeTick))
+            .Concat(magma.SelectMany(m => new[] { m.NextPulseTick, m.ExpireTick }))
             .Concat(traps.Select(trap => trap.ExpireTick))
             .Concat(units.Where(u => !u.IsDefeated).SelectMany(u => u.Statuses.Values.SelectMany(s =>
                 s.Rules.Pulses ? new[] { s.NextPulseTick, s.ExpireTick } : new[] { s.ExpireTick })))
@@ -249,16 +345,41 @@ namespace ShardsOfTheLimit.Domain
                 }
             }
             traps.RemoveAll(trap => trap.ExpireTick <= tick);
+            foreach (MagmaCell hot in magma.ToArray())
+            {
+                if (hot.NextPulseTick == tick && hot.NextPulseTick <= hot.ExpireTick)
+                {
+                    foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && u.Cell == hot.Cell).ToArray())
+                    {
+                        DamageResult burn = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState, hot.Power, MagmaResistanceId);
+                        CombatEffectResolver.Apply(new[] { burn });
+                        results.Add(burn);
+                    }
+
+                    hot.NextPulseTick += 100;
+                }
+
+                if (hot.ExpireTick <= tick) magma.Remove(hot);
+            }
+
             return results;
         }
+        /// <summary>Start of a resonant's own turn: Purifying Flame cleanse, Native Mire and Blood of the Deep healing.</summary>
         public IReadOnlyList<ICombatEffectResult> OnActivation(CombatUnit unit)
         {
+            var results = new List<ICombatEffectResult>();
+            if (unit.IsDefeated) return results;
+            if (unit.GetMechanicStacks(StatusMechanic.PurifyingFlame) > 0) unit.Cleanse();
             var modifier = GetModifiers(unit);
-            if (!modifier.NativeMire || !IsInsideAnyCloud(unit.Cell) || unit.IsDefeated) return Array.Empty<ICombatEffectResult>();
-            int amount = (int)Math.Ceiling(unit.MaximumHealth * modifier.HealPercentPerActivation / 100d);
+            int percent = 0;
+            if (modifier.NativeMire && IsInsideAnyCloud(unit.Cell)) percent += modifier.HealPercentPerActivation;
+            if (modifier.MagmaHealPercent > 0 && MagmaAt(unit.Cell) != null) percent += modifier.MagmaHealPercent;
+            if (percent <= 0) return results;
+            int amount = (int)Math.Ceiling(unit.MaximumHealth * percent / 100d);
             var heal = CombatEffectCalculator.Heal(unit, unit.ResourceState, amount);
             CombatEffectResolver.Apply(new[] { heal });
-            return new ICombatEffectResult[] { heal };
+            results.Add(heal);
+            return results;
         }
         public IEnumerable<TimelineEvent> PreviewEvents(long after, int count)
         {

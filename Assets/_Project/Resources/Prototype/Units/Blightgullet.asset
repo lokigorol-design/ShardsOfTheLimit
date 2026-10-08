@@ -24,6 +24,8 @@ MonoBehaviour:
   defense: 3
   speed: 9
   movementRange: 3
+  movementMode: 0
+  movementActionCost: 1
   periodicResistances:
   - sourceId: POISON
     percent: 50
@@ -34,3 +36,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: f496a3bb2a879404a99e513a0a6dd551, type: 2}
   - {fileID: 11400000, guid: 4a22ef8a663532642a628b84941c5477, type: 2}
   passiveModifiers: {fileID: 11400000, guid: eeccce1b6df76b846a6a4d7410012eae, type: 2}
+  branchVariants:
+  - {fileID: 11400000, guid: 5bc21625dcb8e0d44988767dddce5ef9, type: 2}
+  - {fileID: 11400000, guid: 723bcabc0c6fafc46b558b0ace1654d2, type: 2}
+  - {fileID: 11400000, guid: 5ee596f8ea2f85240a74f59198b282bf, type: 2}

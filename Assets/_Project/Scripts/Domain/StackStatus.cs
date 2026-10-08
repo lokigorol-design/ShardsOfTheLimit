@@ -17,7 +17,10 @@ namespace ShardsOfTheLimit.Domain
         /// <summary>Movement points −50%.</summary>
         Slow,
         /// <summary>Incoming damage +20%.</summary>
-        Vulnerability
+        Vulnerability,
+        /// <summary>Purifying Flame (positive): cleanses negative effects at the start of each own turn;
+        /// melee attackers catch fire.</summary>
+        PurifyingFlame
     }
 
     public static class StatusMechanicRules
@@ -30,6 +33,12 @@ namespace ShardsOfTheLimit.Domain
         public const int OilMovementPenalty = 1;
         public const double SlowMovementFraction = 0.5d;
         public const double VulnerabilityMultiplier = 1.2d;
+
+        /// <summary>Negative effects removed by cleansing: the damaging and hindering mechanics and Immobilize.</summary>
+        public static bool IsNegative(StatusRules rules) =>
+            rules.PreventsMovement || rules.Mechanic == StatusMechanic.Poison || rules.Mechanic == StatusMechanic.Corrosion ||
+            rules.Mechanic == StatusMechanic.Oil || rules.Mechanic == StatusMechanic.Slow ||
+            rules.Mechanic == StatusMechanic.Vulnerability || rules.DamagePerStack > 0;
 
         public static double PoisonPulse(int maximumHealth, int stacks) =>
             stacks <= 0 ? 0 : maximumHealth * PoisonBaseFraction * Math.Pow(stacks, PoisonStackExponent);

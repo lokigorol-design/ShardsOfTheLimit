@@ -15,6 +15,8 @@ namespace ShardsOfTheLimit.Tests
         [UnityTest]
         public IEnumerator PrototypeSceneLoadsStageThreeRosterAndCompletesAiSequence()
         {
+            // Default branches: Fire Worm · Banked Heat (ATK ×1,15, Defense ×0,9).
+            BattlePrototypeController.SetBranchVariant("blaze-worm", 0);
             SceneManager.LoadScene("Assets/_Project/Scenes/PrototypeBattle.unity");
             yield return null;
             yield return null;
@@ -35,8 +37,8 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RepulseStrike"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RaiseGround"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/LowerGround"), Is.Not.Null);
-            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(22));
-            Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(2));
+            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(24));
+            Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(4));
             Assert.That(blazeDefinition.Abilities.All(ability => ability.Icon != null), Is.True);
             BattlePrototypeController controller = Object.FindAnyObjectByType<BattlePrototypeController>();
             BattleFeedbackView feedback = Object.FindAnyObjectByType<BattleFeedbackView>();
@@ -146,7 +148,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Blaze Worm"));
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             Assert.That(controller.ActiveUnit.MaximumHealth, Is.EqualTo(150));
-            Assert.That(controller.ActiveUnit.Attack, Is.EqualTo(18));
+            Assert.That(controller.ActiveUnit.Attack, Is.EqualTo(21), "Banked Heat branch: ATK 18 × 1,15.");
             Assert.That(controller.CurrentReachableCells[new GridCoordinate(0, 3)], Is.EqualTo(3),
                 "Deep Burrow: emerge within Movement 2 × 3 = 6 cells.");
             Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(7, 0)), Is.False, "7 cells is out of range.");

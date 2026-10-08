@@ -47,6 +47,7 @@ namespace ShardsOfTheLimit.Presentation
             if (unitViews.TryGetValue(unit, out CombatUnitView view)) view.PreviewFacing = null;
             facingPreview = null;
             unit.CurrentAction = "Activation ended";
+            FinishActivation(unit);
             feedback.AddLog($"{unit.DisplayName} ends the activation");
             AdvanceTurn();
         }

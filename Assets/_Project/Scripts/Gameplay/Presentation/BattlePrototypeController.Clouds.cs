@@ -21,8 +21,8 @@ namespace ShardsOfTheLimit.Presentation
         {
             areaEffects = new AreaEffectWorld(grid, units);
             foreach (var pair in definitionsByUnit)
-                areaEffects.Register(pair.Key, pair.Value.PassiveModifiers != null
-                    ? pair.Value.PassiveModifiers.Snapshot() : new PassiveModifiers());
+                areaEffects.Register(pair.Key, ModifiersOf(pair.Key) != null
+                    ? ModifiersOf(pair.Key).Snapshot() : new PassiveModifiers());
             foreach (var definition in Resources.LoadAll<CloudDefinition>("Prototype/Clouds"))
                 cloudDefinitions[definition.stableId] = definition;
         }

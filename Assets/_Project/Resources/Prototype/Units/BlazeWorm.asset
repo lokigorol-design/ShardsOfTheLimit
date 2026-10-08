@@ -32,3 +32,11 @@ MonoBehaviour:
   abilities:
   - {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   - {fileID: 11400000, guid: b1000000000000000000000000000002, type: 2}
+  - {fileID: 11400000, guid: 181284d3a888378479a50e2758dffac6, type: 2}
+  - {fileID: 11400000, guid: 6bc1368031d56e144a85da6963278511, type: 2}
+  passiveModifiers: {fileID: 0}
+  branchVariants:
+  - {fileID: 11400000, guid: 85e3b30ccb9ef6a48be254d59888e956, type: 2}
+  - {fileID: 11400000, guid: cfb9e34b5f3c91142843a6755702fa6c, type: 2}
+  - {fileID: 11400000, guid: f631b71694b105a4795374b9fe1b7769, type: 2}
+  - {fileID: 11400000, guid: 3025786970e0151479c37de6512129a1, type: 2}

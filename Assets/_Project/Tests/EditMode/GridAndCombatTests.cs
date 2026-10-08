@@ -941,7 +941,8 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blaze.MovementRange, Is.EqualTo(2));
             Assert.That(blaze.PeriodicResistances.Single().sourceId, Is.EqualTo("BURNING"));
             Assert.That(blaze.PeriodicResistances.Single().percent, Is.EqualTo(50));
-            Assert.That(blaze.Abilities.Count, Is.EqualTo(2), "Fire Worm I: Long Bite and Fire Spit; Deep Burrow is its movement.");
+            Assert.That(blaze.Abilities.Count, Is.EqualTo(4),
+                "Fire Worm I: Long Bite and Fire Spit (+ Purifying Flame on II, Flame Burst on IV); Deep Burrow is its movement.");
             Assert.That(blaze.MovementMode, Is.EqualTo(MovementMode.Burrow));
             Assert.That(blaze.MovementActionCost, Is.EqualTo(2));
             Assert.That(blaze.Abilities.All(ability => ability.Icon != null), Is.True);

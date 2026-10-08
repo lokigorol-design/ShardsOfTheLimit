@@ -33,3 +33,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0c201190ba6097441a39878bfbda5575, type: 2}
   - {fileID: 11400000, guid: f94d98e2211a93c43bdc72d1b6d4a215, type: 2}
   passiveModifiers: {fileID: 0}
+  branchVariants:
+  - {fileID: 11400000, guid: 3b5d5c4508b2f5c47983c31d7db8500f, type: 2}
+  - {fileID: 11400000, guid: 1078f212decc50a42b470cd25e33dc62, type: 2}
+  - {fileID: 11400000, guid: 8396de71b73f86246b06d30677928803, type: 2}
+  - {fileID: 11400000, guid: c4ac7e71b088b1e46a74da6536e28e44, type: 2}

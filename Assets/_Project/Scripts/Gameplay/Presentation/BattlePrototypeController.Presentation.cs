@@ -172,6 +172,7 @@ namespace ShardsOfTheLimit.Presentation
             foreach (PushResult push in results.OfType<PushResult>().Where(result => result.StepsMoved > 0))
             {
                 yield return AnimateForcedMovement(push);
+                yield return EnterCells(push.Target, push.Path.Skip(1).ToArray(), false);
                 yield return TriggerTrapIfAny(push.Target, push.Path.Skip(1));
             }
 
@@ -211,17 +212,32 @@ namespace ShardsOfTheLimit.Presentation
             if (areaEffects == null || unit == null || unit.IsDefeated) yield break;
             GridCoordinate? trapped = cells.Cast<GridCoordinate?>().FirstOrDefault(cell => areaEffects.TrapAt(cell.Value) != null);
             if (!trapped.HasValue) yield break;
-            DamageResult fall = areaEffects.TriggerTrap(unit, trapped.Value);
-            if (fall == null) yield break;
-            feedback.AddLog($"{unit.DisplayName} triggers Lift Trap at {trapped.Value}: thrown up, " +
-                            $"{-fall.ShieldDelta} shield damage, {-fall.HealthDelta} health damage");
-            if (unitViews.TryGetValue(unit, out CombatUnitView view))
+            TrapTrigger trigger = areaEffects.TriggerTrap(unit, trapped.Value);
+            if (trigger == null) yield break;
+            if (trigger.Push != null)
             {
-                yield return AbilityVfx.LiftTrapToss(view.transform, EffectWorldPosition(trapped.Value));
+                // Wall trap: the whirlwind shoves the victim away from the wall.
+                feedback.AddLog($"{unit.DisplayName} triggers a wall Lift Trap at {trapped.Value}: pushed to {trigger.Push.Destination}" +
+                                (trigger.Push.Collided ? $", collision at {trigger.Push.CollisionCell.Value}" : string.Empty));
+                AbilityVfx.TrapMark(EffectWorldPosition(trapped.Value));
+                yield return AnimateForcedMovement(trigger.Push);
+                if (trigger.Push.StepsMoved > 0)
+                    yield return EnterCells(unit, trigger.Push.Path.Skip(1).ToArray(), false);
+            }
+            else if (unitViews.TryGetValue(unit, out CombatUnitView tossed))
+            {
+                feedback.AddLog($"{unit.DisplayName} triggers Lift Trap at {trapped.Value}: thrown up");
+                yield return AbilityVfx.LiftTrapToss(tossed.transform, EffectWorldPosition(trapped.Value));
+            }
+
+            foreach (DamageResult hit in trigger.Damage)
+            {
+                feedback.AddLog(DescribeResult(hit, false));
+                if (!unitViews.TryGetValue(hit.Target, out CombatUnitView view)) continue;
                 Vector3 label = view.transform.position + Vector3.up * 0.75f;
-                if (fall.ShieldDelta < 0) feedback.AddFloatingText(label, $"{fall.ShieldDelta} SHIELD", new Color(0.2f, 0.75f, 1f));
-                if (fall.HealthDelta < 0) feedback.AddFloatingText(label + Vector3.up * 0.22f, $"{fall.HealthDelta} HP", new Color(1f, 0.28f, 0.2f));
-                if (unit.IsDefeated)
+                if (hit.ShieldDelta < 0) feedback.AddFloatingText(label, $"{hit.ShieldDelta} SHIELD", new Color(0.2f, 0.75f, 1f));
+                if (hit.HealthDelta < 0) feedback.AddFloatingText(label + Vector3.up * 0.22f, $"{hit.HealthDelta} HP", new Color(1f, 0.28f, 0.2f));
+                if (hit.Target.IsDefeated)
                 {
                     AbilityVfx.Defeat(view.transform.position);
                     view.gameObject.SetActive(false);

@@ -40,6 +40,11 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField] private List<AbilityDefinition> abilities = new List<AbilityDefinition>();
         [SerializeField] private PassiveModifierDefinition passiveModifiers;
         public PassiveModifierDefinition PassiveModifiers => passiveModifiers;
+        [SerializeField, Tooltip("Branch variants (II/IV choices) selectable before a battle; the first is the default.")]
+        private List<PassiveModifierDefinition> branchVariants = new List<PassiveModifierDefinition>();
+        public IReadOnlyList<PassiveModifierDefinition> BranchVariants => branchVariants != null
+            ? branchVariants
+            : (IReadOnlyList<PassiveModifierDefinition>)Array.Empty<PassiveModifierDefinition>();
 
         public string StableId => stableId;
         public string DisplayName => displayName;

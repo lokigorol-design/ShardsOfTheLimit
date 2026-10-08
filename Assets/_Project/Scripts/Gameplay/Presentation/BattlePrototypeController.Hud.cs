@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ShardsOfTheLimit.Definitions;
 using ShardsOfTheLimit.Domain;
+using ShardsOfTheLimit.Runtime;
 using UnityEngine;
 
 namespace ShardsOfTheLimit.Presentation
@@ -216,15 +217,23 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             GUI.Label(new Rect(x, panel.y + 58f, width, 18f),
-                $"АТК {active.Attack}  ЗАЩ {active.EffectiveDefense:0.#}  СКОР {active.Speed}", hudSmallStyle);
+                $"АТК {active.Attack}  ЗАЩ {active.EffectiveDefense:0.#}  СКОР {active.EffectiveSpeed:0.#}", hudSmallStyle);
             GUI.Label(new Rect(x, panel.y + 74f, 30f, 18f), "ОД", hudSmallStyle);
-            for (int index = 0; index < ActionsPerTurn; index++)
+            // Banked Heat can start a turn with 3 AP.
+            for (int index = 0; index < Mathf.Max(ActionsPerTurn, active.CurrentActionPoints); index++)
             {
                 var pip = new Rect(x + 26f + index * 20f, panel.y + 78f, 14f, 14f);
                 Fill(pip, new Color(0f, 0f, 0f, 0.7f));
                 if (index < active.CurrentActionPoints) Fill(new Rect(pip.x + 2f, pip.y + 2f, 10f, 10f), new Color(1f, 0.82f, 0.25f));
             }
 
+            // Branch passive (the part after the species name), e.g. "Twin Eruption"; B cycles it and restarts.
+            string branch = BranchVariantName(active);
+            if (branch.Contains("·")) branch = branch.Substring(branch.IndexOf('·') + 1).Trim();
+            if (branch.Length > 0)
+                GUI.Label(new Rect(x + 72f, panel.y + 74f, width - 72f, 18f),
+                    definition != null && definition.BranchVariants.Count > 1 && active.ControlType == ControlType.Player
+                        ? $"{branch} [B]" : branch, hudSmallStyle);
             DrawStatusIcons(active, new Rect(panel.x + 10f, panel.y + 102f, panel.width - 20f, 28f), 26f);
         }
 
@@ -266,7 +275,7 @@ namespace ShardsOfTheLimit.Presentation
                 : new AbilityDefinition[0];
             bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
             bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
-            float count = abilities.Count + 1;
+            float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0);
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
             if (panel.x < 324f) panel.x = 324f;
@@ -295,7 +304,8 @@ namespace ShardsOfTheLimit.Presentation
                 AbilityDefinition ability = abilities[index];
                 var rect = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
                 int cooldown = active.GetCooldown(ability.StableId);
-                bool usable = canAct && cooldown == 0 && active.CurrentActionPoints >= ability.ActionCost;
+                bool usable = canAct && CanUseAbility(active, ability);
+                bool extending = IsExtending(active, ability);
                 bool selected = mode == InteractionMode.AbilityTargeting && selectedAbilityIndex == index;
                 Fill(new Rect(rect.x - 2f, rect.y - 2f, rect.width + 4f, rect.height + 4f),
                     selected ? new Color(1f, 0.85f, 0.3f) : usable ? new Color(0.55f, 0.48f, 0.35f) : new Color(0.2f, 0.2f, 0.22f));
@@ -312,10 +322,27 @@ namespace ShardsOfTheLimit.Presentation
                 if (cooldown > 0) GUI.Label(rect, $"КД {cooldown}", hudTitleStyle.Center());
                 Fill(new Rect(rect.x, rect.y, 18f, 18f), new Color(0f, 0f, 0f, 0.75f));
                 GUI.Label(new Rect(rect.x, rect.y, 18f, 18f), (index + 1).ToString(), hudBadgeStyle);
-                for (int ap = 0; ap < ability.ActionCost; ap++)
+                for (int ap = 0; ap < AbilityCost(active, ability); ap++)
                     Fill(new Rect(rect.xMax - 12f - ap * 12f, rect.y + 4f, 8f, 8f), new Color(1f, 0.82f, 0.25f));
+                if (extending)
+                {
+                    Fill(new Rect(rect.x, rect.yMax - 18f, rect.width, 18f), new Color(0.6f, 0.15f, 0.02f, 0.85f));
+                    GUI.Label(new Rect(rect.x, rect.yMax - 18f, rect.width, 18f), $"ПРОДЛ. {active.Channel.Stage}→", hudBadgeStyle);
+                }
                 if (rect.Contains(Event.current.mousePosition)) hoveredAbilityIndex = index;
                 x += AbilityButtonSize + 8f;
+            }
+
+            if (abilities.Any(AbilityRuntime.IsSurfaceAbility))
+            {
+                // Ritual Surfaces: floor or wall for Surface abilities (Tab).
+                var surface = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
+                GUI.enabled = canAct;
+                Fill(new Rect(surface.x - 2f, surface.y - 2f, surface.width + 4f, surface.height + 4f),
+                    wallMode ? new Color(0.95f, 0.78f, 0.35f) : new Color(0.3f, 0.3f, 0.33f));
+                if (GUI.Button(surface, wallMode ? "СТЕНА\n(Tab)" : "ПОЛ\n(Tab)", hudButtonStyle)) ToggleWallMode();
+                if (surface.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -3;
+                GUI.enabled = true;
             }
 
             GUI.enabled = canAct || facingStep && !isBusy;
@@ -326,6 +353,9 @@ namespace ShardsOfTheLimit.Presentation
             GUI.enabled = true;
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
+            else if (hoveredAbilityIndex == -3) DrawTextTooltip(panel, "Ритуальные поверхности",
+                "Способности «Поверхность» применяются к полу или к стене. Стена — столб на 2+ единицы выше соседней клетки " +
+                "или препятствие, обращённое к тотему; эффект выходит из неё перпендикулярно в клетку перед ней.");
             else if (hoveredAbilityIndex == -2) DrawTextTooltip(panel, "Перемещение",
                 active.MovementMode == MovementMode.Burrow
                     ? $"Подземный ход: 2 ОД, выныривает в любой свободной клетке в радиусе {MovementBudget(active)}. Высота и стены не мешают."

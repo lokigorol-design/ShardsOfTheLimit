@@ -70,6 +70,23 @@ namespace ShardsOfTheLimit.Domain
             return null;
         }
 
+        /// <summary>Storm Magnet cast on a wall: the first resonant on the single line coming out of the wall.</summary>
+        public static CombatUnit FindFirstOnRay(TacticalGrid grid, GridCoordinate start, GridCoordinate direction, int reach,
+            IEnumerable<CombatUnit> units)
+        {
+            var candidates = new List<CombatUnit>();
+            foreach (CombatUnit unit in units) if (!unit.IsDefeated) candidates.Add(unit);
+            for (int step = 0; step <= reach; step++)
+            {
+                var cell = new GridCoordinate(start.X + direction.X * step, start.Y + direction.Y * step);
+                if (!grid.Contains(cell) || !grid.GetCell(cell).IsWalkable) return null;
+                CombatUnit hit = candidates.Find(unit => unit.Cell == cell);
+                if (hit != null) return hit;
+            }
+
+            return null;
+        }
+
         /// <summary>Pull straight towards a surface point; on a floor point the target ends on the point itself.</summary>
         public static PushResult PullToPoint(TacticalGrid grid, CombatUnit target, GridCoordinate point,
             GridCoordinate targetPosition, Func<GridCoordinate, bool> isOccupied)

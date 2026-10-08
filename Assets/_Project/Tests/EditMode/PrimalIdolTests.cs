@@ -134,7 +134,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(world.TrapAt(trapCell), Is.Not.Null);
 
             enemy.MoveTo(trapCell);
-            DamageResult fall = world.TriggerTrap(enemy, trapCell);
+            DamageResult fall = world.TriggerTrap(enemy, trapCell).Damage.Single();
             Assert.That(fall.HealthDamage, Is.EqualTo(10));
             Assert.That(world.TrapAt(trapCell), Is.Null, "A trap fires once.");
             Assert.That(world.TriggerTrap(enemy, trapCell), Is.Null);

@@ -188,8 +188,43 @@ namespace ShardsOfTheLimit.Domain
         public void BeginActivation(int actionPoints)
         {
             ActivationCount++;
-            CurrentActionPoints = Math.Max(0, actionPoints);
+            CurrentActionPoints = Math.Max(0, actionPoints) + PendingBonusActionPoints;
+            PendingBonusActionPoints = 0;
             CurrentAction = "Ready";
+        }
+
+        /// <summary>Banked Heat: +1 AP at the next activation; does not accumulate.</summary>
+        public int PendingBonusActionPoints { get; private set; }
+
+        public void BankActionPoint() => PendingBonusActionPoints = 1;
+
+        /// <summary>Fractional Speed from branch bonuses (Banked Heat +0.5, Roaring Furnace −0.5).</summary>
+        public double SpeedBonus { get; set; }
+        public double EffectiveSpeed => Speed + SpeedBonus;
+
+        /// <summary>Active channelled ability (tag «Поддерживающее», e.g. Flame Burst), or null.</summary>
+        public ChannelState Channel { get; private set; }
+
+        public void SetChannel(ChannelState channel) => Channel = channel;
+        public void EndChannel() => Channel = null;
+
+        /// <summary>Removes every negative status and Burning (Purifying Flame).</summary>
+        public int Cleanse()
+        {
+            int removed = 0;
+            foreach (string id in statuses.Where(s => StatusMechanicRules.IsNegative(s.Value.Rules)).Select(s => s.Key).ToArray())
+            {
+                statuses.Remove(id);
+                removed++;
+            }
+
+            if (IsBurning)
+            {
+                BurningState = default;
+                removed++;
+            }
+
+            return removed;
         }
 
         public bool SpendActionPoints(int cost)

@@ -64,6 +64,12 @@ namespace ShardsOfTheLimit.Presentation
                 case "LiftTrap":
                     routine = LiftTrapCast(context);
                     return true;
+                case "PurifyingFlame":
+                    routine = PurifyingFlameCast(context);
+                    return true;
+                case "FlameBurst":
+                    routine = FlameBurstCast(context);
+                    return true;
                 default:
                     routine = null;
                     return false;
@@ -362,6 +368,67 @@ namespace ShardsOfTheLimit.Presentation
         }
 
         /// <summary>Pending Fire Geyser mark: a smouldering ring that everyone can see.</summary>
+        /// <summary>Purifying Flame: a ring of white-gold fire climbs the resonant and burns its afflictions away.</summary>
+        private static IEnumerator PurifyingFlameCast(AbilityVfxContext context)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Vector3 feet = context.Source - Vector3.up * 0.45f;
+            for (int wave = 0; wave < 6; wave++)
+            {
+                ParticleSpec flame = ParticleSpec.Flame(0.3f);
+                flame.StartColor = new Color(1f, 0.92f, 0.6f, 1f);
+                vfx.Ring(feet + Vector3.up * wave * 0.16f, 16, 0.8f, flame);
+                yield return new WaitForSeconds(0.05f);
+            }
+
+            vfx.Burst(context.Source + Vector3.up * 0.4f, 20, ParticleSpec.Sparks(new Color(1f, 0.95f, 0.7f), 2.2f));
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        /// <summary>Flame Burst: the worm opens its maw and a cone of fire rolls over the cells.</summary>
+        private static IEnumerator FlameBurstCast(AbilityVfxContext context)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Vector3 mouth = context.Source + Vector3.up * 0.2f;
+            vfx.Burst(mouth, 14, ParticleSpec.Flame(0.35f));
+            float elapsed = 0f;
+            while (elapsed < 0.45f)
+            {
+                elapsed += Time.deltaTime;
+                foreach (Vector3 cell in context.ImpactCells)
+                {
+                    Vector3 toCell = cell + Vector3.up * 0.25f - mouth;
+                    vfx.Emit(mouth + toCell * Random.Range(0.1f, 1f), ParticleSpec.Flame(0.42f), toCell.normalized * 1.4f);
+                }
+
+                vfx.Shake(0.02f, 0.05f);
+                yield return null;
+            }
+
+            foreach (Vector3 cell in context.ImpactCells) FireImpact(cell, 0.45f);
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        /// <summary>Magma on a cell: glowing crust with lazy sparks.</summary>
+        public static void MagmaMark(Vector3 point)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            ParticleSpec glow = ParticleSpec.Flame(0.22f);
+            glow.StartColor = new Color(1f, 0.32f, 0.04f, 0.9f);
+            glow.Velocity = Vector3.up * 0.15f;
+            vfx.Emit(point + new Vector3(Random.Range(-0.4f, 0.4f), 0.04f, Random.Range(-0.4f, 0.4f)), glow);
+            if (Random.value < 0.25f) vfx.Emit(point + Vector3.up * 0.05f, ParticleSpec.Sparks(new Color(1f, 0.55f, 0.15f), 0.6f, 0.05f));
+        }
+
+        /// <summary>An active Flame Burst cone keeps flickering until it goes out.</summary>
+        public static void FlameConeMark(Vector3 point)
+        {
+            if (Random.value < 0.5f) return;
+            ParticleSpec flame = ParticleSpec.Flame(0.28f);
+            flame.Velocity = Vector3.up * 0.6f;
+            VfxSystem.Instance.Emit(point + new Vector3(Random.Range(-0.35f, 0.35f), 0.1f, Random.Range(-0.35f, 0.35f)), flame);
+        }
+
         public static void GeyserMark(Vector3 point)
         {
             Rune(point, new Color(1f, 0.4f, 0.1f), 3);

@@ -49,6 +49,7 @@ namespace ShardsOfTheLimit.Tests
             var idol = Unit("idol", C(0, 0), Team.Player);
             var near = Unit("near", C(4, 2), Team.Opponent);
             var far = Unit("far", C(2, 4), Team.Opponent);
+            near.SetFacing(C(-1, 0));
             var units = new[] { idol, near, far };
             world = new AreaEffectWorld(grid, units);
             var point = C(2, 2);

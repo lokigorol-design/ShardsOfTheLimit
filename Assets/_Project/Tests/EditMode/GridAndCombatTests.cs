@@ -241,6 +241,8 @@ namespace ShardsOfTheLimit.Tests
             CombatUnit strong = CreateUnit(new GridCoordinate(1, 2), team: Team.Player, attack: 20);
             CombatUnit target = CreateUnit(new GridCoordinate(2, 1), maximumHealth: 100);
             CombatUnit secondTarget = CreateUnit(new GridCoordinate(2, 2), maximumHealth: 100);
+            target.SetFacing(new GridCoordinate(-1, 0));
+            secondTarget.SetFacing(new GridCoordinate(-1, 0));
 
             int weakHit = -AbilityRuntime.Preview(heavyStrike, grid, weak, target.Cell, new[] { weak, target })
                 .Results.OfType<DamageResult>().Single().HealthDelta;
@@ -324,6 +326,7 @@ namespace ShardsOfTheLimit.Tests
             CombatUnit source = CreateUnit(new GridCoordinate(1, 1), team: Team.Player, attack: 20);
             CombatUnit target = CreateUnit(new GridCoordinate(2, 1), maximumHealth: 100);
             CombatUnit wall = CreateUnit(new GridCoordinate(4, 1), maximumHealth: 100);
+            target.SetFacing(new GridCoordinate(-1, 0));
             CombatUnit[] units = { source, target, wall };
 
             AbilityResolution preview = AbilityRuntime.Preview(repulse, grid, source, target.Cell, units);
@@ -367,6 +370,7 @@ namespace ShardsOfTheLimit.Tests
             CombatUnit ally = CreateUnit(new GridCoordinate(1, 2), maximumHealth: 100, team: Team.Player);
             CombatUnit enemyBehind = CreateUnit(new GridCoordinate(2, 2), maximumHealth: 100);
             CombatUnit enemyAbove = CreateUnit(new GridCoordinate(0, 4), maximumHealth: 100);
+            enemyAbove.SetFacing(new GridCoordinate(0, -1));
             CombatUnit[] units = { worm, ally, enemyBehind, enemyAbove };
 
             IReadOnlyCollection<GridCoordinate> targets = AbilityRuntime.GetTargetableCells(bite, grid, worm, units);
@@ -657,6 +661,7 @@ namespace ShardsOfTheLimit.Tests
             TacticalGrid grid = CreateGrid(6, 3);
             CombatUnit source = CreateUnit(new GridCoordinate(1, 1), team: Team.Player);
             CombatUnit target = CreateUnit(new GridCoordinate(2, 1), team: Team.Opponent);
+            target.SetFacing(new GridCoordinate(-1, 0));
             CombatUnit[] units = { source, target };
 
             AbilityResolution preview = AbilityRuntime.Preview(repulse, grid, source, target.Cell, units);
@@ -724,10 +729,13 @@ namespace ShardsOfTheLimit.Tests
         [Test]
         public void MeleeAndRangedHeightRulesAdjustRangeInOppositeWays()
         {
-            Assert.That(AbilityRangeCalculator.GetEffectiveRange(1, AbilityRangeType.Melee, 0, 2), Is.Zero);
-            Assert.That(AbilityRangeCalculator.GetEffectiveRange(1, AbilityRangeType.Melee, 2, 0), Is.Zero);
-            Assert.That(AbilityRangeCalculator.GetEffectiveRange(4, AbilityRangeType.Ranged, 0, 3), Is.EqualTo(2));
-            Assert.That(AbilityRangeCalculator.GetEffectiveRange(4, AbilityRangeType.Ranged, 3, 0), Is.EqualTo(6));
+            // Design 2.5, 16.10.11: melee −1 per full 3 units, ranged ±1 per full 2 units.
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(1, AbilityRangeType.Melee, 0, 2), Is.EqualTo(1));
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(1, AbilityRangeType.Melee, 3, 0), Is.Zero);
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(2, AbilityRangeType.Melee, 0, 6), Is.Zero);
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(4, AbilityRangeType.Ranged, 0, 3), Is.EqualTo(3));
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(4, AbilityRangeType.Ranged, 3, 0), Is.EqualTo(5));
+            Assert.That(AbilityRangeCalculator.GetEffectiveRange(4, AbilityRangeType.Ranged, 4, 0), Is.EqualTo(6));
         }
 
         [Test]
@@ -740,7 +748,7 @@ namespace ShardsOfTheLimit.Tests
             {
                 for (int y = 0; y < 3; y++)
                 {
-                    int height = x == 0 && y == 1 ? 3 : x == 1 && y == 1 ? 1 : 0;
+                    int height = x == 0 && y == 1 ? 4 : x == 1 && y == 1 ? 1 : 0;
                     cells.Add(new GridCell(new GridCoordinate(x, y), height));
                 }
             }
@@ -750,12 +758,12 @@ namespace ShardsOfTheLimit.Tests
             IReadOnlyCollection<GridCoordinate> ranged =
                 AbilityRuntime.GetTargetingRangeCells(fireBurst, grid, source);
             CollectionAssert.Contains(ranged.ToArray(), new GridCoordinate(6, 1),
-                "A height advantage of 3 must add 2 cells to ranged range 4.");
+                "A height advantage of 4 units adds 2 cells to ranged range 4.");
 
             IReadOnlyCollection<GridCoordinate> melee =
                 AbilityRuntime.GetTargetingRangeCells(heavyStrike, grid, source);
             CollectionAssert.DoesNotContain(melee.ToArray(), new GridCoordinate(1, 1),
-                "A two-level melee height difference must reduce range 1 to zero.");
+                "A three-unit melee height difference reduces range 1 to zero.");
         }
 
         [Test]

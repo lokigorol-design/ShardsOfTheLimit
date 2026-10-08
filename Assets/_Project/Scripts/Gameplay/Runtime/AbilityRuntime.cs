@@ -89,6 +89,12 @@ namespace ShardsOfTheLimit.Runtime
                 geometricTargets = geometricTargets.Where(c => grid.GetCell(c).IsWalkable &&
                     !battleUnits.Any(unit => !unit.IsDefeated && unit.Cell == c)).ToArray();
 
+            if (ability.RangeType == AbilityRangeType.Ranged)
+            {
+                // A ranged ability needs a line of fire to the chosen cell (16.10.12).
+                geometricTargets = geometricTargets.Where(cell => LineOfFire.IsClear(grid, source.Cell, cell)).ToArray();
+            }
+
             if (ability.TargetType != AbilityTargetType.Unit)
             {
                 return geometricTargets;
@@ -276,6 +282,7 @@ namespace ShardsOfTheLimit.Runtime
                         result = statusResult;
                     }
                     else result = Calculate(
+                        ability,
                         effect,
                         source,
                         target,
@@ -294,6 +301,7 @@ namespace ShardsOfTheLimit.Runtime
                     {
                         forecastPositions[target] = push.Destination;
                         if (push.Collided) AddCollisionDamage(push, source, battleUnits, forecast, forecastPositions, results);
+                        AddFallDamage(push, forecastTerrain, forecast, results);
                     }
                     else if (result is BurnAppliedResult burn)
                     {
@@ -378,7 +386,38 @@ namespace ShardsOfTheLimit.Runtime
             }
         }
 
+        /// <summary>Forced displacement off a ledge: every step that drops 3+ units costs fall damage (16.10.11).</summary>
+        private static void AddFallDamage(
+            PushResult push,
+            IReadOnlyDictionary<GridCoordinate, GridCell> terrain,
+            IDictionary<CombatUnit, CombatResourceState> forecast,
+            ICollection<ICombatEffectResult> results)
+        {
+            for (int index = 1; index < push.Path.Count; index++)
+            {
+                if (!forecast.TryGetValue(push.Target, out CombatResourceState state) || state.Health <= 0) return;
+                int drop = terrain[push.Path[index - 1]].Height - terrain[push.Path[index]].Height;
+                double damage = FallRules.DamageForDrop(push.Target.MaximumHealth, drop);
+                if (damage <= 0) continue;
+                DamageResult fall = CombatEffectCalculator.PeriodicDamage(push.Target, state, damage, AreaEffectWorld.FallResistanceId);
+                results.Add(fall);
+                forecast[push.Target] = CombatEffectCalculator.Apply(state, fall);
+            }
+        }
+
+        /// <summary>Height (16.10.11) and facing (D-033) multipliers of a direct hit from the source position.</summary>
+        public static double HitMultiplier(AbilityDefinition ability, TacticalGrid grid, CombatUnit target,
+            GridCoordinate sourcePosition, GridCoordinate targetPosition)
+        {
+            if (sourcePosition == targetPosition) return 1d;
+            double height = HitModifiers.HeightMultiplier(ability.RangeType,
+                grid.GetCell(sourcePosition).Height, grid.GetCell(targetPosition).Height);
+            double facing = HitModifiers.FacingMultiplier(FacingRules.GetSide(targetPosition, target.Facing, sourcePosition));
+            return height * facing;
+        }
+
         private static ICombatEffectResult Calculate(
+            AbilityDefinition ability,
             AbilityEffectDefinition effect,
             CombatUnit source,
             CombatUnit target,
@@ -397,7 +436,8 @@ namespace ShardsOfTheLimit.Runtime
                 case PullToPointEffectDefinition _:
                     return ForcedMovementCalculator.PullToPoint(grid, target, point, targetPosition, isOccupied);
                 case DamageEffectDefinition damage:
-                    return CombatEffectCalculator.Damage(target, state, damage.RawDamage(source.Attack));
+                    return CombatEffectCalculator.Damage(target, state,
+                        damage.RawDamage(source.Attack) * HitMultiplier(ability, grid, target, sourcePosition, targetPosition));
                 case HealEffectDefinition heal:
                     return CombatEffectCalculator.Heal(target, state, heal.Amount);
                 case GrantShieldEffectDefinition shield:

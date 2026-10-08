@@ -573,10 +573,15 @@ namespace ShardsOfTheLimit.Domain
         public static AttackSide GetSide(CombatUnit target, GridCoordinate attackerCell)
         {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            if (attackerCell == target.Cell) return AttackSide.Front;
-            GridCoordinate towardsAttacker = Towards(target.Cell, attackerCell);
-            if (towardsAttacker == target.Facing) return AttackSide.Front;
-            return towardsAttacker.X == -target.Facing.X && towardsAttacker.Y == -target.Facing.Y
+            return GetSide(target.Cell, target.Facing, attackerCell);
+        }
+
+        public static AttackSide GetSide(GridCoordinate targetCell, GridCoordinate facing, GridCoordinate attackerCell)
+        {
+            if (attackerCell == targetCell) return AttackSide.Front;
+            GridCoordinate towardsAttacker = Towards(targetCell, attackerCell);
+            if (towardsAttacker == facing) return AttackSide.Front;
+            return towardsAttacker.X == -facing.X && towardsAttacker.Y == -facing.Y
                 ? AttackSide.Back
                 : AttackSide.Side;
         }

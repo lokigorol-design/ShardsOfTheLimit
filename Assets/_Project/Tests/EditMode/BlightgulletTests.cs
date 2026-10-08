@@ -18,7 +18,7 @@ namespace ShardsOfTheLimit.Tests
         [SetUp] public void Setup()
         {
             grid = new TacticalGrid(Enumerable.Range(0,7).SelectMany(x => Enumerable.Range(0,4).Select(y => new GridCell(C(x,y),0,true))));
-            owner = Unit("owner",C(0),Team.Player); target = Unit("target",C(2));
+            owner = Unit("owner",C(0),Team.Player); target = Unit("target",C(2)); target.SetFacing(C(-1));
             world = new AreaEffectWorld(grid,new[] { owner,target });
         }
         private CloudAreaEffect Cloud(string status = "POISON", int x = 2, int speed = 1, int duration = 300, CombatUnit source = null,

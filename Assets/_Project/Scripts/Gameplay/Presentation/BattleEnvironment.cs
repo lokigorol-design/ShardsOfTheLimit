@@ -86,7 +86,15 @@ namespace ShardsOfTheLimit.Presentation
             var volume = new GameObject("Battle Post Process").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.priority = 10f;
-            volume.sharedProfile = profile;
+            // Runtime copy so the authored asset stays untouched; a soft far blur gives the miniature-table look.
+            VolumeProfile runtimeProfile = Object.Instantiate(profile);
+            if (!runtimeProfile.TryGet(out DepthOfField depthOfField)) depthOfField = runtimeProfile.Add<DepthOfField>(true);
+            depthOfField.mode.Override(DepthOfFieldMode.Gaussian);
+            depthOfField.gaussianStart.Override(21f);
+            depthOfField.gaussianEnd.Override(48f);
+            depthOfField.gaussianMaxRadius.Override(1.2f);
+            depthOfField.highQualitySampling.Override(true);
+            volume.profile = runtimeProfile;
         }
 
         /// <summary>Stone material for one cell column; its colour is the tint the highlights replace.</summary>

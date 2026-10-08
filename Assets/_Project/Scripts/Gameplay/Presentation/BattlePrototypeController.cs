@@ -52,8 +52,8 @@ namespace ShardsOfTheLimit.Presentation
         private const float MaximumCameraZoom = 11.5f;
         private const float CameraZoomStep = 0.8f;
         private const float CameraZoomSpeed = 10f;
-        private const float MinimumCameraPitch = 20f;
-        private const float MaximumCameraPitch = 72f;
+        private const float MinimumCameraPitch = 30f;
+        private const float MaximumCameraPitch = 78f;
         private const float CameraKeyboardPanSpeed = 0.85f;
 
         private static readonly Color ReachableColor = new Color(0.18f, 0.48f, 0.92f);
@@ -67,10 +67,11 @@ namespace ShardsOfTheLimit.Presentation
         private static readonly Color FacingOptionColor = new Color(0.85f, 0.55f, 0.25f);
         private static readonly Vector3 DefaultCameraPivot = new Vector3(0f, 0.2f, 0f);
         private static readonly Vector3 DefaultCameraOffset = new Vector3(10.5f, 11.5f, -11.2f);
-        private static readonly float CameraOrbitDistance = DefaultCameraOffset.magnitude;
-        private static readonly float DefaultCameraPitch = Mathf.Atan2(
-            DefaultCameraOffset.y,
-            new Vector2(DefaultCameraOffset.x, DefaultCameraOffset.z).magnitude) * Mathf.Rad2Deg;
+        // Tabletop camera: a perspective lens looking down at the board like a player leaning over a table.
+        // Zoom is the dolly distance (zoom × CameraDistancePerZoom world units), not an orthographic size.
+        private const float CameraFieldOfView = 34f;
+        private const float CameraDistancePerZoom = 2.2f;
+        private const float DefaultCameraPitch = 52f;
 
         private readonly Dictionary<GridCoordinate, CellView> cellViews = new Dictionary<GridCoordinate, CellView>();
         private readonly Dictionary<CombatUnit, CombatUnitView> unitViews = new Dictionary<CombatUnit, CombatUnitView>();
@@ -131,6 +132,8 @@ namespace ShardsOfTheLimit.Presentation
         public float CameraRotation => cameraRotation;
         public float CameraPitch => cameraPitch;
         public float CameraZoom => cameraZoom;
+        /// <summary>Distance from the camera to the board pivot it orbits.</summary>
+        public float CameraDistance => cameraZoom * CameraDistancePerZoom;
         public Vector3 CameraPivotPosition => cameraPivot;
         public bool BattleEnded => battleEnded;
         public BattleOutcome Outcome => outcome;
@@ -452,13 +455,15 @@ namespace ShardsOfTheLimit.Presentation
                 cameraObject.AddComponent<AudioListener>();
             }
 
-            battleCamera.orthographic = true;
+            battleCamera.orthographic = false;
+            battleCamera.fieldOfView = CameraFieldOfView;
+            battleCamera.nearClipPlane = 0.3f;
+            battleCamera.farClipPlane = 150f;
             cameraZoom = DefaultCameraZoom;
             targetCameraZoom = DefaultCameraZoom;
             cameraPitch = DefaultCameraPitch;
             targetCameraPitch = DefaultCameraPitch;
             cameraPivot = DefaultCameraPivot;
-            battleCamera.orthographicSize = cameraZoom;
             battleCamera.backgroundColor = new Color(0.055f, 0.07f, 0.1f);
             ApplyCameraTransform();
 
@@ -497,7 +502,8 @@ namespace ShardsOfTheLimit.Presentation
             {
                 Vector2 currentPointer = Input.mousePosition;
                 Vector2 pointerDelta = currentPointer - previousCameraPointer;
-                float worldUnitsPerPixel = cameraZoom * 2f / Mathf.Max(1f, Screen.height);
+                float viewHeight = 2f * CameraDistance * Mathf.Tan(CameraFieldOfView * 0.5f * Mathf.Deg2Rad);
+                float worldUnitsPerPixel = viewHeight / Mathf.Max(1f, Screen.height);
                 Vector3 screenRight = Vector3.ProjectOnPlane(battleCamera.transform.right, Vector3.up).normalized;
                 Vector3 screenUp = Vector3.ProjectOnPlane(battleCamera.transform.up, Vector3.up).normalized;
                 RequestCameraPan(
@@ -533,7 +539,7 @@ namespace ShardsOfTheLimit.Presentation
                 CameraZoomSpeed * Time.unscaledDeltaTime);
             if (Mathf.Approximately(updatedZoom, cameraZoom)) return;
             cameraZoom = updatedZoom;
-            if (battleCamera != null) battleCamera.orthographicSize = cameraZoom;
+            ApplyCameraTransform();
         }
 
         private void UpdateKeyboardCameraPan()
@@ -563,8 +569,8 @@ namespace ShardsOfTheLimit.Presentation
                 DefaultCameraOffset.z).normalized;
             horizontalDirection = Quaternion.AngleAxis(cameraRotation, Vector3.up) * horizontalDirection;
             float pitchRadians = cameraPitch * Mathf.Deg2Rad;
-            Vector3 orbitOffset = horizontalDirection * (Mathf.Cos(pitchRadians) * CameraOrbitDistance) +
-                                  Vector3.up * (Mathf.Sin(pitchRadians) * CameraOrbitDistance);
+            Vector3 orbitOffset = horizontalDirection * (Mathf.Cos(pitchRadians) * CameraDistance) +
+                                  Vector3.up * (Mathf.Sin(pitchRadians) * CameraDistance);
             battleCamera.transform.position = cameraPivot + orbitOffset;
             battleCamera.transform.LookAt(cameraPivot);
         }

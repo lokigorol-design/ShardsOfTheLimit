@@ -118,7 +118,8 @@ namespace ShardsOfTheLimit.Tests
             controller.RequestCameraZoom(2f);
             yield return new WaitForSeconds(0.5f);
             Assert.That(controller.CameraZoom, Is.LessThan(initialCameraZoom));
-            Assert.That(Camera.main.orthographicSize, Is.EqualTo(controller.CameraZoom).Within(0.01f));
+            Assert.That(Camera.main.orthographic, Is.False, "Tabletop perspective camera.");
+            Assert.That(Vector3.Distance(Camera.main.transform.position, controller.CameraPivotPosition), Is.EqualTo(controller.CameraDistance).Within(0.05f));
             controller.RequestCameraZoom(100f);
             yield return new WaitForSeconds(0.5f);
             Assert.That(controller.CameraZoom, Is.EqualTo(4.25f).Within(0.01f));

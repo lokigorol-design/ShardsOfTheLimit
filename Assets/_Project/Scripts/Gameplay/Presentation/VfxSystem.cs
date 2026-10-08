@@ -99,7 +99,7 @@ namespace ShardsOfTheLimit.Presentation
         }
 
         private const int MaximumParticles = 2400;
-        // Authored sizes are in cells; the orthographic battle camera reads them better slightly enlarged.
+        // Authored sizes are in cells; seen from the tabletop camera they read better slightly enlarged.
         private const float SizeScale = 1.5f;
         private static VfxSystem instance;
 

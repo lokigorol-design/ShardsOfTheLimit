@@ -60,7 +60,7 @@ namespace ShardsOfTheLimit.Presentation
 
         private void Update()
         {
-            if (Unit == null) return;
+            if (Unit == null || Unit.IsDefeated) return;
             GridCoordinate facing = PreviewFacing ?? Unit.Facing;
             Quaternion target = Quaternion.LookRotation(new Vector3(facing.X, 0f, facing.Y));
             transform.rotation = Quaternion.RotateTowards(transform.rotation, target, 540f * Time.deltaTime);

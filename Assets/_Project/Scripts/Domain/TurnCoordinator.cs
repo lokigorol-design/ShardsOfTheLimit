@@ -69,6 +69,30 @@ namespace ShardsOfTheLimit.Domain
                 unit => (long)SpeedTimeline.GetInterval(unit.EffectiveSpeed));
         }
 
+        /// <summary>A resonant summoned onto the field joins the timeline; its first turn comes one interval later.</summary>
+        public void AddUnit(CombatUnit unit, long firstActivationTick)
+        {
+            if (unit == null) throw new ArgumentNullException(nameof(unit));
+            if (!units.Contains(unit)) units.Add(unit);
+            if (!stableOrder.ContainsKey(unit)) stableOrder[unit] = stableOrder.Count == 0 ? 0 : stableOrder.Values.Max() + 1;
+            nextActivationTicks[unit] = firstActivationTick;
+        }
+
+        /// <summary>A recalled resonant leaves the timeline (never the unit whose turn it is).</summary>
+        public void RemoveUnit(CombatUnit unit)
+        {
+            if (unit == null || unit == CurrentUnit) return;
+            units.Remove(unit);
+            nextActivationTicks.Remove(unit);
+        }
+
+        public void SetNextActivation(CombatUnit unit, long tick)
+        {
+            if (unit != null && nextActivationTicks.ContainsKey(unit)) nextActivationTicks[unit] = tick;
+        }
+
+        public bool Contains(CombatUnit unit) => units.Contains(unit);
+
         public long CurrentTick { get; private set; }
         public CombatUnit CurrentUnit { get; private set; }
         public IReadOnlyList<CombatUnit> LivingUnits => units.Where(unit => !unit.IsDefeated).ToArray();

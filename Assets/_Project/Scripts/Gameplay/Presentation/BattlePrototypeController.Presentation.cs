@@ -158,6 +158,9 @@ namespace ShardsOfTheLimit.Presentation
                 }
             }
 
+            foreach (CombatUnitView hitView in hitViews)
+                if (hitView.TryGetComponent(out ProceduralAnimator animator) && !hitView.Unit.IsDefeated)
+                    StartCoroutine(animator.Hit());
             yield return feedback.PlayHitReactions(hitViews);
             foreach (DamageResult result in results.OfType<DamageResult>().Where(result => result.Defeated))
             {
@@ -165,7 +168,7 @@ namespace ShardsOfTheLimit.Presentation
                 {
                     feedback.AddLog($"{result.Target.DisplayName} is defeated");
                     AbilityVfx.Defeat(defeatedView.transform.position);
-                    defeatedView.gameObject.SetActive(false);
+                    HideDefeated(defeatedView);
                 }
             }
 
@@ -192,6 +195,27 @@ namespace ShardsOfTheLimit.Presentation
                     yield return AnimateUnitToCurrentCell(unit);
                 }
             }
+        }
+
+        /// <summary>A defeated resonant topples and sinks (procedural death), then disappears.</summary>
+        private void HideDefeated(CombatUnitView view)
+        {
+            if (view == null || !view.gameObject.activeSelf) return;
+            if (view.TryGetComponent(out ProceduralAnimator animator))
+            {
+                if (!animator.IsDying) StartCoroutine(animator.Die());
+                return;
+            }
+
+            view.gameObject.SetActive(false);
+        }
+
+        /// <summary>Attack animation of the caster; Long Bite has its own lunge in the signature effect.</summary>
+        private void PlayCastAnimation(CombatUnit source, AbilityDefinition ability)
+        {
+            if (ability.StableId == "blaze-long-bite" || !unitViews.TryGetValue(source, out CombatUnitView view) ||
+                !view.TryGetComponent(out ProceduralAnimator animator)) return;
+            StartCoroutine(animator.Lunge(ability.RangeType == AbilityRangeType.Melee));
         }
 
         /// <summary>A walking path ends on the first trapped cell: the trap stops the resonant there.</summary>
@@ -240,7 +264,7 @@ namespace ShardsOfTheLimit.Presentation
                 if (hit.Target.IsDefeated)
                 {
                     AbilityVfx.Defeat(view.transform.position);
-                    view.gameObject.SetActive(false);
+                    HideDefeated(view);
                 }
             }
         }
@@ -363,6 +387,7 @@ namespace ShardsOfTheLimit.Presentation
             GridCoordinate target,
             IReadOnlyCollection<GridCoordinate> impact)
         {
+            PlayCastAnimation(source, ability);
             Transform sourceView = unitViews.TryGetValue(source, out CombatUnitView view) ? view.transform : null;
             CombatUnit targetUnit = units.FirstOrDefault(unit => !unit.IsDefeated && unit.Cell == target);
             PullToPointEffectDefinition magnet = ability.Effects.OfType<PullToPointEffectDefinition>().FirstOrDefault();
@@ -415,7 +440,7 @@ namespace ShardsOfTheLimit.Presentation
                     if (tick.Target.IsDefeated)
                     {
                         AbilityVfx.Defeat(view.transform.position);
-                        view.gameObject.SetActive(false);
+                        HideDefeated(view);
                     }
                 }
 

@@ -105,6 +105,7 @@ namespace ShardsOfTheLimit.Presentation
         private void BeginTurn(CombatUnit unit)
         {
             PresentTimelineResults(turns.LastTimelineResults);
+            UpdateArchonLink();
             RefreshCloudViews();
             if (EvaluateBattleEnd()) return;
             if (unit == null) return;

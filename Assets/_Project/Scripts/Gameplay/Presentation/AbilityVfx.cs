@@ -409,6 +409,71 @@ namespace ShardsOfTheLimit.Presentation
             yield return new WaitForSeconds(0.2f);
         }
 
+        private static readonly Color StoneLight = new Color(1f, 0.85f, 0.45f, 1f);
+
+        /// <summary>The Archon raises the resonance stone: a short golden flare.</summary>
+        public static void ArchonCommand(Vector3 position)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            vfx.Burst(position + Vector3.up * 0.7f, 18, ParticleSpec.Sparks(StoneLight, 1.8f, 0.07f));
+            vfx.Ring(position - Vector3.up * 0.5f, 18, 1.1f, ParticleSpec.Smoke(new Color(1f, 0.8f, 0.4f, 0.35f), 0.25f, 0.6f));
+        }
+
+        /// <summary>Recall: the resonant dissolves into light that streams up into the stone.</summary>
+        public static IEnumerator RecallBeam(Transform body)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Vector3 start = body.position;
+            Vector3 scale = body.localScale;
+            float elapsed = 0f;
+            const float duration = 0.6f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                body.localScale = new Vector3(scale.x * (1f - t * 0.8f), scale.y * (1f + t * 0.6f), scale.z * (1f - t * 0.8f));
+                body.position = start + Vector3.up * t * 0.4f;
+                ParticleSpec mote = ParticleSpec.Sparks(StoneLight, 0.4f, 0.06f);
+                mote.Velocity = Vector3.up * 3.5f;
+                for (int index = 0; index < 4; index++)
+                    vfx.Emit(start + new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(-0.5f, 0.6f), Random.Range(-0.3f, 0.3f)), mote);
+                yield return null;
+            }
+
+            vfx.Burst(start + Vector3.up * 0.5f, 24, ParticleSpec.Sparks(StoneLight, 2.5f, 0.07f));
+        }
+
+        /// <summary>Summon: a ring of light opens on the cell and the resonant rises out of it.</summary>
+        public static IEnumerator SummonPortal(Transform body, Vector3 ground)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Vector3 target = body.position;
+            Vector3 scale = body.localScale;
+            body.position = target - Vector3.up * 0.9f;
+            float elapsed = 0f;
+            const float duration = 0.55f;
+            vfx.Ring(ground + Vector3.up * 0.05f, 28, 1.6f, ParticleSpec.Sparks(StoneLight, 0.5f, 0.08f));
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                body.position = Vector3.Lerp(target - Vector3.up * 0.9f, target, t);
+                body.localScale = scale * Mathf.Lerp(0.6f, 1f, t);
+                ParticleSpec column = ParticleSpec.Sparks(StoneLight, 0.3f, 0.05f);
+                column.Velocity = Vector3.up * 2.4f;
+                vfx.Emit(ground + new Vector3(Random.Range(-0.35f, 0.35f), 0.05f, Random.Range(-0.35f, 0.35f)), column);
+                yield return null;
+            }
+
+            body.position = target;
+            body.localScale = scale;
+            vfx.Burst(ground + Vector3.up * 0.3f, 20, ParticleSpec.Smoke(new Color(1f, 0.85f, 0.55f, 0.4f), 0.4f, 0.8f), 0.3f);
+            vfx.Shake(0.05f, 0.15f);
+        }
+
+        /// <summary>Short fire flare on one cell (worm entry).</summary>
+        public static void FireBurstAt(Vector3 position) => FireImpact(position, 0.5f);
+
         /// <summary>Magma on a cell: glowing crust with lazy sparks.</summary>
         public static void MagmaMark(Vector3 point)
         {

@@ -111,8 +111,63 @@ public static class ResonantBranchesSetup
                 v.stickyMudStatus = toadBase != null ? toadBase.stickyMudStatus : null;
             }));
 
+        CreateArchon();
         AssetDatabase.SaveAssets();
         Debug.Log("[ResonantBranchesSetup] Worm abilities and branch variants of worm, toad and idol ready.");
+    }
+
+    /// <summary>The Archon unit: moves, summons, recalls; no attacks. Placeholder hooded-figure portrait.</summary>
+    private static void CreateArchon()
+    {
+        const string portraitPath = "Assets/_Project/Art/Portraits/Archon/Archon_Portrait.png";
+        if (!File.Exists(portraitPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(portraitPath));
+            const int size = 256;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = x / (float)size * 2f - 1f;
+                float v = y / (float)size * 2f - 1f;
+                bool hood = u * u / 0.22f + (v - 0.15f) * (v - 0.15f) / 0.3f < 1f && v > -0.35f;
+                bool face = u * u / 0.06f + (v - 0.05f) * (v - 0.05f) / 0.09f < 1f;
+                bool coat = v < -0.25f && Mathf.Abs(u) < 0.45f + (-0.25f - v) * 0.6f;
+                bool stone = (u - 0.62f) * (u - 0.62f) + (v - 0.55f) * (v - 0.55f) < 0.012f;
+                bool staff = Mathf.Abs(u - 0.62f) < 0.025f && v < 0.48f;
+                Color background = Color.Lerp(new Color(0.08f, 0.07f, 0.1f), new Color(0.35f, 0.28f, 0.12f),
+                    Mathf.Clamp01(1f - (u * u + v * v) * 0.7f));
+                Color pixel = stone ? new Color(1f, 0.88f, 0.5f) : face ? new Color(0.78f, 0.62f, 0.5f)
+                    : hood || coat ? new Color(0.17f, 0.19f, 0.28f) : staff ? new Color(0.4f, 0.27f, 0.15f) : background;
+                pixel.a = 1f;
+                texture.SetPixel(x, y, pixel);
+            }
+
+            File.WriteAllBytes(portraitPath, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(portraitPath);
+            if (AssetImporter.GetAtPath(portraitPath) is TextureImporter importer)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.maxTextureSize = 512;
+                importer.SaveAndReimport();
+            }
+        }
+
+        Asset<UnitDefinition>("Units/Archon", unit =>
+        {
+            Set(unit, "stableId", "archon");
+            Set(unit, "displayName", "Archon");
+            Set(unit, "portrait", AssetDatabase.LoadAssetAtPath<Sprite>(portraitPath));
+            Set(unit, "maximumHealth", 120);
+            Set(unit, "maximumShield", 0);
+            Set(unit, "attack", 0);
+            Set(unit, "defense", 3);
+            Set(unit, "speed", 10);
+            Set(unit, "movementRange", 3);
+            SetArray(unit, "abilities");
+        });
     }
 
     /// <summary>Magma Worm II: Magma Trail, HP ×1,1, ATK ×1,1, Defense ×0,9, Movement +1.</summary>

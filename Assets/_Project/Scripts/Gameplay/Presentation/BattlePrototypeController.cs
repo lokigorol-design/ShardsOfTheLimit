@@ -18,7 +18,11 @@ namespace ShardsOfTheLimit.Presentation
             Movement,
             AbilityTargeting,
             /// <summary>End-of-turn step: the player chooses where the resonant faces.</summary>
-            Facing
+            Facing,
+            /// <summary>Archon: choose where a reserve resonant appears (or whom it replaces).</summary>
+            Summon,
+            /// <summary>Archon: choose which resonant returns to the stone.</summary>
+            Recall
         }
 
         private sealed class AiAbilityPlan
@@ -227,6 +231,14 @@ namespace ShardsOfTheLimit.Presentation
 
             for (int index = 0; index < 6; index++)
             {
+                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + index)) && IsArchon(turns.CurrentUnit))
+                {
+                    // Archon: 1..N summon from the reserve, N+1 recalls.
+                    if (index < reserve.Count) BeginSummon(index);
+                    else if (index == reserve.Count) BeginRecall();
+                    continue;
+                }
+
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + index)))
                 {
                     // Pressing the selected ability's key again returns to movement.
@@ -238,6 +250,7 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 if (mode == InteractionMode.Facing) CancelFacing();
+                else if (IsArchonMode) SelectUnit(selectedUnit);
                 else CancelAbility();
             }
 
@@ -330,14 +343,16 @@ namespace ShardsOfTheLimit.Presentation
             SpawnUnit(opponentDefinitions[0], Team.Opponent, ControlType.BasicAI, blightgulletShowcase ? new GridCoordinate(4, 0) : new GridCoordinate(7, 7), new Color(0.95f, 0.2f, 0.18f));
             SpawnUnit(opponentDefinitions[1], Team.Opponent, ControlType.BasicAI, new GridCoordinate(7, 3), new Color(1f, 0.52f, 0.12f));
             SpawnUnit(opponentDefinitions[1], Team.Opponent, ControlType.BasicAI, new GridCoordinate(5, 6), new Color(0.95f, 0.72f, 0.12f));
+            if (!blightgulletShowcase) SpawnArchonAndReserve();
         }
 
-        private void SpawnUnit(
+        private CombatUnit SpawnUnit(
             UnitDefinition definition,
             Team team,
             ControlType controlType,
             GridCoordinate coordinate,
-            Color fallbackColor)
+            Color fallbackColor,
+            bool onField = true)
         {
             PassiveModifierDefinition modifiers = ChooseVariant(definition);
             ScaleStats(definition, modifiers, out int health, out int attack, out int defense, out int movement);
@@ -358,24 +373,40 @@ namespace ShardsOfTheLimit.Presentation
                 if (!string.IsNullOrWhiteSpace(resistance.sourceId))
                     unit.SetPeriodicResistance(resistance.sourceId, resistance.percent);
             ConfigureBranch(unit, definition, modifiers);
-            units.Add(unit);
             definitionsByUnit.Add(unit, definition);
+            unitColors[unit] = fallbackColor;
+            // Teams start facing each other along X; the player re-chooses facing at the end of every turn.
+            unit.SetFacing(team == Team.Player ? new GridCoordinate(1, 0) : new GridCoordinate(-1, 0));
+            if (!onField) return unit;
+            units.Add(unit);
+            CreateUnitView(unit);
+            return unit;
+        }
 
+        private readonly Dictionary<CombatUnit, Color> unitColors = new Dictionary<CombatUnit, Color>();
+
+        /// <summary>Model, aura and facing wedge of a unit standing on the field.</summary>
+        private CombatUnitView CreateUnitView(CombatUnit unit)
+        {
+            UnitDefinition definition = definitionsByUnit[unit];
+            Color fallbackColor = unitColors.TryGetValue(unit, out Color color) ? color : Color.white;
+            Team team = unit.Team;
             GameObject body = definition.VisualPrefab != null
                 ? CreateAuthoredUnitView(definition)
                 : PlaceholderModelFactory.Create(definition, team, fallbackColor);
             body.name = $"{definition.DisplayName} [{team}]";
             body.transform.SetParent(transform, false);
-            body.transform.position = UnitWorldPosition(coordinate);
-            // Teams start facing each other along X; the player re-chooses facing at the end of every turn.
-            unit.SetFacing(team == Team.Player ? new GridCoordinate(1, 0) : new GridCoordinate(-1, 0));
+            body.transform.position = UnitWorldPosition(unit.Cell);
             body.transform.rotation = Quaternion.LookRotation(new Vector3(unit.Facing.X, 0f, unit.Facing.Y));
             body.transform.localScale = Vector3.one;
             CombatUnitView view = body.AddComponent<CombatUnitView>();
             view.Initialize(unit, fallbackColor);
+            // Procedural animation test; captures the model before the aura and the facing wedge are added.
+            body.AddComponent<ProceduralAnimator>().Initialize(definition.StableId == "primal-idol" ? 0.08f : 0f);
             body.AddComponent<StatusAuraView>().Initialize(unit);
             CreateFacingWedge(body.transform, team);
-            unitViews.Add(unit, view);
+            unitViews[unit] = view;
+            return view;
         }
 
         private static Material facingWedgeMaterial;
@@ -703,7 +734,9 @@ namespace ShardsOfTheLimit.Presentation
 
         private bool EvaluateBattleEnd()
         {
-            outcome = BattleReadabilityRules.EvaluateOutcome(units);
+            // The Archon does not count: the battle is lost when every resonant (field and reserve) has fallen.
+            outcome = BattleReadabilityRules.EvaluateOutcome(units.Where(unit => unit != archon)
+                .Concat(reserve.Select(slot => slot.Unit)));
             if (outcome == BattleOutcome.Ongoing) return false;
 
             battleEnded = true;

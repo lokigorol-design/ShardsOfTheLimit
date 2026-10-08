@@ -275,7 +275,8 @@ namespace ShardsOfTheLimit.Presentation
                 : new AbilityDefinition[0];
             bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
             bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
-            float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0);
+            float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0) +
+                          (IsArchon(active) ? reserve.Count + 1 : 0);
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
             if (panel.x < 324f) panel.x = 324f;
@@ -298,6 +299,8 @@ namespace ShardsOfTheLimit.Presentation
 
             if (moveRect.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -2;
             x += AbilityButtonSize + 8f;
+
+            if (IsArchon(active)) x = DrawArchonButtons(active, x, y, canAct);
 
             for (int index = 0; index < abilities.Count; index++)
             {
@@ -353,6 +356,16 @@ namespace ShardsOfTheLimit.Presentation
             GUI.enabled = true;
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
+            else if (hoveredAbilityIndex == -4 && hoveredReserveIndex >= 0 && hoveredReserveIndex < reserve.Count)
+                DrawTextTooltip(panel, "Призыв: " + reserve[hoveredReserveIndex].Unit.DisplayName,
+                    $"1 ОД и Концентрация (раз в {ArchonRules.ConcentrationTicks} тиков). В свободную клетку до " +
+                    $"{ArchonRules.SummonRange} от Архонта, если на поле меньше {ArchonRules.FieldLimit} резонантов, " +
+                    $"или на место своего резонанта в радиусе связи {ArchonRules.LinkRadius} (замена). " +
+                    $"Здоровье {reserve[hoveredReserveIndex].Unit.CurrentHealth}/{reserve[hoveredReserveIndex].Unit.MaximumHealth}." +
+                    (ConcentrationReady ? string.Empty : $"\nКонцентрация готова на тике {concentrationReadyTick}."));
+            else if (hoveredAbilityIndex == -5) DrawTextTooltip(panel, "Отзыв",
+                $"1 ОД и Концентрация. Свой резонант в радиусе связи {ArchonRules.LinkRadius} уходит в камень: " +
+                "срабатывает его эффект отзыва, отрицательные эффекты снимаются. Вернуть его можно через 300 тиков.");
             else if (hoveredAbilityIndex == -3) DrawTextTooltip(panel, "Ритуальные поверхности",
                 "Способности «Поверхность» применяются к полу или к стене. Стена — столб на 2+ единицы выше соседней клетки " +
                 "или препятствие, обращённое к тотему; эффект выходит из неё перпендикулярно в клетку перед ней.");
@@ -361,6 +374,62 @@ namespace ShardsOfTheLimit.Presentation
                     ? $"Подземный ход: 2 ОД, выныривает в любой свободной клетке в радиусе {MovementBudget(active)}. Высота и стены не мешают."
                     : $"Шаг по клеткам: {MovementBudget(active)} очков передвижения за 1 ОД. Подъём стоит дороже.");
         }
+
+        /// <summary>Archon bar: one button per reserve resonant (summon or swap) and a recall button.</summary>
+        private float DrawArchonButtons(CombatUnit active, float x, float y, bool canAct)
+        {
+            bool ready = ConcentrationReady && active.CurrentActionPoints >= ArchonRules.ActionCost;
+            for (int index = 0; index < reserve.Count; index++)
+            {
+                ReserveSlot slot = reserve[index];
+                var rect = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
+                bool available = canAct && ready && slot.IsAvailable(turns.CurrentTick);
+                bool selected = mode == InteractionMode.Summon && selectedReserveIndex == index;
+                Fill(new Rect(rect.x - 2f, rect.y - 2f, rect.width + 4f, rect.height + 4f),
+                    selected ? new Color(1f, 0.85f, 0.3f) : available ? new Color(0.55f, 0.48f, 0.35f) : new Color(0.2f, 0.2f, 0.22f));
+                GUI.enabled = available;
+                Sprite portrait = definitionsByUnit.TryGetValue(slot.Unit, out UnitDefinition reserveDefinition) ? reserveDefinition.Portrait : null;
+                if (GUI.Button(rect, portrait != null ? GUIContent.none : new GUIContent("ПРИЗЫВ\n" + slot.Unit.DisplayName), hudButtonStyle))
+                {
+                    if (selected) SelectUnit(active);
+                    else BeginSummon(index);
+                }
+
+                GUI.enabled = true;
+                if (portrait != null) Icon(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f), portrait);
+                if (!available) Fill(rect, new Color(0f, 0f, 0f, 0.55f));
+                if (slot.Unit.IsDefeated) GUI.Label(rect, "ПАЛ", hudTitleStyle.Center());
+                else if (!slot.IsAvailable(turns.CurrentTick)) GUI.Label(rect, $"{slot.AvailableTick}т", hudTitleStyle.Center());
+                Bar(new Rect(rect.x + 3f, rect.yMax - 8f, rect.width - 6f, 5f),
+                    slot.Unit.CurrentHealth / (float)slot.Unit.MaximumHealth, HealthColor);
+                Fill(new Rect(rect.x, rect.y, 18f, 18f), new Color(0f, 0f, 0f, 0.75f));
+                GUI.Label(new Rect(rect.x, rect.y, 18f, 18f), (index + 1).ToString(), hudBadgeStyle);
+                if (rect.Contains(Event.current.mousePosition))
+                {
+                    hoveredAbilityIndex = -4;
+                    hoveredReserveIndex = index;
+                }
+
+                x += AbilityButtonSize + 8f;
+            }
+
+            var recall = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
+            bool recallSelected = mode == InteractionMode.Recall;
+            GUI.enabled = canAct && ready;
+            Fill(new Rect(recall.x - 2f, recall.y - 2f, recall.width + 4f, recall.height + 4f),
+                recallSelected ? new Color(1f, 0.85f, 0.3f) : new Color(0.3f, 0.3f, 0.36f));
+            if (GUI.Button(recall, $"ОТЗЫВ\n({reserve.Count + 1})", hudButtonStyle))
+            {
+                if (recallSelected) SelectUnit(active);
+                else BeginRecall();
+            }
+
+            GUI.enabled = true;
+            if (recall.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -5;
+            return x + AbilityButtonSize + 8f;
+        }
+
+        private int hoveredReserveIndex = -1;
 
         private void DrawAbilityTooltip(AbilityDefinition ability, CombatUnit active, Rect anchor)
         {
@@ -473,11 +542,18 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetMouseButtonUp(1) && (mouse - rightPressPosition).sqrMagnitude < 36f && canAct)
             {
                 if (mode == InteractionMode.AbilityTargeting) CancelAbility();
+                else if (IsArchonMode) SelectUnit(selectedUnit);
                 else ClearMovementPreview();
             }
 
             if (!canAct || overHud || !Input.GetMouseButtonDown(0) || !hoveredCell.HasValue) return;
             GridCoordinate target = hoveredCell.Value;
+            if (IsArchonMode)
+            {
+                if (!RequestArchonAction(target)) status = "Эта клетка вне зелёной зоны.";
+                return;
+            }
+
             if (mode == InteractionMode.AbilityTargeting)
             {
                 if (!targetable.Contains(target))
@@ -532,6 +608,7 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             GridCoordinate cell = hoveredCell.Value;
+            if (IsArchonMode) return;
             if (mode == InteractionMode.AbilityTargeting)
             {
                 if (targetable.Contains(cell) && selectedAbilityTarget != cell) HandleCellChoice(cell);

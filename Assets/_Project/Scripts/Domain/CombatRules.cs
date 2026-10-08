@@ -135,6 +135,15 @@ namespace ShardsOfTheLimit.Domain
 
         public void MoveTo(GridCoordinate cell) => Cell = cell;
 
+        /// <summary>Link Break ends: the Archon gets up with a share of its health (no shield).</summary>
+        public void Revive(int health)
+        {
+            if (!IsDefeated) return;
+            CurrentHealth = Math.Max(1, Math.Min(MaximumHealth, health));
+            CurrentShield = 0;
+            BurningState = default;
+        }
+
         /// <summary>Cardinal direction the resonant faces (front). Chosen by the player at the end of each turn.</summary>
         public GridCoordinate Facing { get; private set; } = new GridCoordinate(1, 0);
 

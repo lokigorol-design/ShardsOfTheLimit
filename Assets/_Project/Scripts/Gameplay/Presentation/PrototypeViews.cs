@@ -55,6 +55,17 @@ namespace ShardsOfTheLimit.Presentation
             }
         }
 
+        /// <summary>Facing shown while the player is still choosing it; null shows the unit's real facing.</summary>
+        public GridCoordinate? PreviewFacing { get; set; }
+
+        private void Update()
+        {
+            if (Unit == null) return;
+            GridCoordinate facing = PreviewFacing ?? Unit.Facing;
+            Quaternion target = Quaternion.LookRotation(new Vector3(facing.X, 0f, facing.Y));
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, 540f * Time.deltaTime);
+        }
+
         public void SetHitFlash(float strength)
         {
             float clamped = Mathf.Clamp01(strength);

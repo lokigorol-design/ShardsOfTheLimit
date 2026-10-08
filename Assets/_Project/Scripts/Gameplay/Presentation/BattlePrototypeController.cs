@@ -16,7 +16,9 @@ namespace ShardsOfTheLimit.Presentation
         private enum InteractionMode
         {
             Movement,
-            AbilityTargeting
+            AbilityTargeting,
+            /// <summary>End-of-turn step: the player chooses where the resonant faces.</summary>
+            Facing
         }
 
         private sealed class AiAbilityPlan
@@ -62,6 +64,7 @@ namespace ShardsOfTheLimit.Presentation
         private static readonly Color ForcedPathColor = new Color(0.68f, 0.28f, 0.92f);
         private static readonly Color ForcedDestinationColor = new Color(1f, 0.2f, 0.92f);
         private static readonly Color SelectedCellColor = new Color(1f, 0.9f, 0.2f);
+        private static readonly Color FacingOptionColor = new Color(0.85f, 0.55f, 0.25f);
         private static readonly Vector3 DefaultCameraPivot = new Vector3(0f, 0.2f, 0f);
         private static readonly Vector3 DefaultCameraOffset = new Vector3(10.5f, 11.5f, -11.2f);
         private static readonly float CameraOrbitDistance = DefaultCameraOffset.magnitude;
@@ -271,12 +274,14 @@ namespace ShardsOfTheLimit.Presentation
 
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                CancelAbility();
+                if (mode == InteractionMode.Facing) CancelFacing();
+                else CancelAbility();
             }
 
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             {
-                ConfirmCurrentChoice();
+                if (mode == InteractionMode.Facing) EndPlayerTurn();
+                else ConfirmCurrentChoice();
             }
 
             if (Input.GetKeyDown(KeyCode.Space))
@@ -606,15 +611,36 @@ namespace ShardsOfTheLimit.Presentation
             body.name = $"{definition.DisplayName} [{team}]";
             body.transform.SetParent(transform, false);
             body.transform.position = UnitWorldPosition(coordinate);
-            Vector3 facingDirection = team == Team.Player
-                ? new Vector3(1f, 0f, 1f)
-                : new Vector3(-1f, 0f, -1f);
-            body.transform.rotation = Quaternion.LookRotation(facingDirection);
+            // Teams start facing each other along X; the player re-chooses facing at the end of every turn.
+            unit.SetFacing(team == Team.Player ? new GridCoordinate(1, 0) : new GridCoordinate(-1, 0));
+            body.transform.rotation = Quaternion.LookRotation(new Vector3(unit.Facing.X, 0f, unit.Facing.Y));
             body.transform.localScale = Vector3.one;
             CombatUnitView view = body.AddComponent<CombatUnitView>();
             view.Initialize(unit, fallbackColor);
             body.AddComponent<StatusAuraView>().Initialize(unit);
+            CreateFacingWedge(body.transform, team);
             unitViews.Add(unit, view);
+        }
+
+        private static Material facingWedgeMaterial;
+
+        /// <summary>Flat arrow on the ground in front of a resonant: shows its front at a glance.</summary>
+        private static void CreateFacingWedge(Transform unitRoot, Team team)
+        {
+            if (facingWedgeMaterial == null) facingWedgeMaterial = new Material(Shader.Find("Sprites/Default")) { name = "Facing Wedge" };
+            var wedge = new GameObject("Facing Wedge");
+            wedge.transform.SetParent(unitRoot, false);
+            wedge.transform.localPosition = new Vector3(0f, -0.58f, 0.36f);
+            Color color = team == Team.Player ? new Color(0.35f, 0.75f, 1f, 0.85f) : new Color(1f, 0.38f, 0.28f, 0.85f);
+            var mesh = new Mesh { name = "Facing Wedge" };
+            mesh.vertices = new[] { new Vector3(0f, 0f, 0.2f), new Vector3(0.17f, 0f, -0.02f), new Vector3(-0.17f, 0f, -0.02f) };
+            mesh.triangles = new[] { 0, 1, 2, 0, 2, 1 };
+            mesh.colors = new[] { color, color * 0.8f, color * 0.8f };
+            mesh.RecalculateBounds();
+            wedge.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = wedge.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = facingWedgeMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         private static GameObject CreateAuthoredUnitView(UnitDefinition definition)
@@ -843,6 +869,7 @@ namespace ShardsOfTheLimit.Presentation
         {
             if (unit.MovementMode == MovementMode.Burrow && path.Count > 1)
             {
+                FaceTowards(unit, path[0], path[path.Count - 1]);
                 yield return AnimateBurrow(unit, path[path.Count - 1]);
                 yield break;
             }
@@ -850,6 +877,7 @@ namespace ShardsOfTheLimit.Presentation
             for (int index = 1; index < path.Count; index++)
             {
                 GridCoordinate next = path[index];
+                FaceTowards(unit, path[index - 1], next);
                 Vector3 destination = UnitWorldPosition(next);
                 Transform body = unitViews[unit].transform;
                 while ((body.position - destination).sqrMagnitude > 0.0004f)
@@ -947,6 +975,7 @@ namespace ShardsOfTheLimit.Presentation
             selectedUnit.CurrentAction = $"Casting {ability.DisplayName}";
             status = $"{selectedUnit.DisplayName} launches {ability.DisplayName}...";
             feedback.AddLog($"{selectedUnit.DisplayName} casts {ability.DisplayName} at {target} (-{ability.ActionCost} AP)");
+            FaceTowards(selectedUnit, selectedUnit.Cell, target);
             yield return PlayAbilityVisual(selectedUnit, ability, target, actualImpact);
 
 
@@ -1234,6 +1263,10 @@ namespace ShardsOfTheLimit.Presentation
             EndPlayerTurn();
         }
 
+        /// <summary>
+        /// Ending a player turn has two steps: first the facing step (choose where the resonant looks),
+        /// then the confirmation that passes the turn on.
+        /// </summary>
         private void EndPlayerTurn()
         {
             if (battleEnded || isBusy || turns?.CurrentUnit?.ControlType != ControlType.Player)
@@ -1241,9 +1274,66 @@ namespace ShardsOfTheLimit.Presentation
                 return;
             }
 
-            turns.CurrentUnit.CurrentAction = "Activation ended";
-            feedback.AddLog($"{turns.CurrentUnit.DisplayName} ends the activation");
+            if (mode != InteractionMode.Facing)
+            {
+                BeginFacingStep();
+                return;
+            }
+
+            CombatUnit unit = turns.CurrentUnit;
+            if (facingPreview.HasValue && facingPreview.Value != unit.Facing)
+            {
+                unit.SetFacing(facingPreview.Value);
+                feedback.AddLog($"{unit.DisplayName} faces {DescribeDirection(unit.Facing)}");
+            }
+
+            if (unitViews.TryGetValue(unit, out CombatUnitView view)) view.PreviewFacing = null;
+            facingPreview = null;
+            unit.CurrentAction = "Activation ended";
+            feedback.AddLog($"{unit.DisplayName} ends the activation");
             AdvanceTurn();
+        }
+
+        private GridCoordinate? facingPreview;
+
+        private void BeginFacingStep()
+        {
+            if (EvaluateBattleEnd()) return;
+            CombatUnit unit = turns.CurrentUnit;
+            ClearInteractionState();
+            selectedUnit = unit;
+            mode = InteractionMode.Facing;
+            facingPreview = unit.Facing;
+            lastFacingPointer = Input.mousePosition;
+            unit.CurrentAction = "Choosing facing";
+            status = "Куда смотрит резонант? Наведи курсор на сторону и кликни. Enter или Space — подтвердить, Esc — вернуться к действиям.";
+            RefreshHighlights();
+        }
+
+        private void PreviewFacing(GridCoordinate direction)
+        {
+            if (mode != InteractionMode.Facing || selectedUnit == null) return;
+            facingPreview = direction;
+            if (unitViews.TryGetValue(selectedUnit, out CombatUnitView view)) view.PreviewFacing = direction;
+            RefreshHighlights();
+        }
+
+        private void CancelFacing()
+        {
+            if (mode != InteractionMode.Facing || selectedUnit == null) return;
+            if (unitViews.TryGetValue(selectedUnit, out CombatUnitView view)) view.PreviewFacing = null;
+            facingPreview = null;
+            SelectUnit(selectedUnit);
+        }
+
+        private static string DescribeDirection(GridCoordinate direction) =>
+            direction.X > 0 ? "+X" : direction.X < 0 ? "-X" : direction.Y > 0 ? "+Y" : "-Y";
+
+        /// <summary>A resonant turns to face where it moved or what it targets.</summary>
+        private void FaceTowards(CombatUnit unit, GridCoordinate from, GridCoordinate to)
+        {
+            if (unit == null || from == to) return;
+            unit.SetFacing(FacingRules.Towards(from, to));
         }
 
         private void AdvanceTurn()
@@ -1433,6 +1523,7 @@ namespace ShardsOfTheLimit.Presentation
                 feedback.AddLog($"{unit.DisplayName} casts {ability.DisplayName} at {abilityTarget} (-{ability.ActionCost} AP)");
                 RefreshHighlights();
                 yield return new WaitForSeconds(0.35f);
+                FaceTowards(unit, unit.Cell, abilityTarget);
                 yield return PlayAbilityVisual(unit, ability, abilityTarget, previewImpact);
 
 
@@ -1448,6 +1539,12 @@ namespace ShardsOfTheLimit.Presentation
 
             if (EvaluateBattleEnd()) yield break;
 
+            // AI facing step: turn towards the nearest enemy so its back is not left open.
+            CombatUnit closestEnemy = units
+                .Where(candidate => candidate.Team != unit.Team && !candidate.IsDefeated)
+                .OrderBy(candidate => candidate.Cell.ManhattanDistance(unit.Cell))
+                .FirstOrDefault();
+            if (closestEnemy != null) FaceTowards(unit, unit.Cell, closestEnemy.Cell);
             unit.CurrentAction = "Turn complete";
             feedback.AddLog($"{unit.DisplayName} ends the turn");
             aiDecisionRolls.Remove(unit);
@@ -1814,7 +1911,15 @@ namespace ShardsOfTheLimit.Presentation
                 view.SetColor(view.BaseColor);
             }
 
-            if (mode == InteractionMode.Movement)
+            if (mode == InteractionMode.Facing && selectedUnit != null)
+            {
+                foreach (GridCoordinate direction in new[] { new GridCoordinate(1, 0), new GridCoordinate(-1, 0), new GridCoordinate(0, 1), new GridCoordinate(0, -1) })
+                {
+                    var neighbour = new GridCoordinate(selectedUnit.Cell.X + direction.X, selectedUnit.Cell.Y + direction.Y);
+                    SetColor(new[] { neighbour }, facingPreview == direction ? SelectedCellColor : FacingOptionColor);
+                }
+            }
+            else if (mode == InteractionMode.Movement)
             {
                 SetColor(reachable.Keys, ReachableColor);
                 SetColor(selectedPath, PathColor);
@@ -2032,6 +2137,8 @@ namespace ShardsOfTheLimit.Presentation
             if (battleEnded) return "Бой окончен. Можно начать заново.";
             if (isBusy) return "Действие выполняется…";
             if (turns?.CurrentUnit?.ControlType != ControlType.Player) return "Ход противника.";
+            if (mode == InteractionMode.Facing)
+                return "Куда смотрит резонант: наведи на сторону, клик или Enter — подтвердить, ПКМ или Esc — назад.";
             if (mode == InteractionMode.AbilityTargeting && selectedAbilityTarget.HasValue)
                 return "Оранжевое — зона удара. Клик по цели применяет способность, правая кнопка — отмена.";
             if (mode == InteractionMode.AbilityTargeting)
@@ -2184,8 +2291,13 @@ namespace ShardsOfTheLimit.Presentation
                 if (screen.z <= 0f) continue;
                 string label = string.Join("  ", group.Select(BuildPreviewLabel).Where(text => text.Length > 0));
                 if (label.Length == 0) label = "NO CHANGE";
+                if (selectedUnit != null && group.Key != selectedUnit && group.Any(result => result.Kind == CombatEffectKind.Damage))
+                {
+                    AttackSide side = FacingRules.GetSide(group.Key, selectedUnit.Cell);
+                    if (side != AttackSide.Front) label += side == AttackSide.Back ? "  В СПИНУ" : "  В БОК";
+                }
                 GUI.Box(
-                    new Rect(screen.x - 70f, Screen.height - screen.y - 14f, 140f, 28f),
+                    new Rect(screen.x - 100f, Screen.height - screen.y - 14f, 200f, 28f),
                     label,
                     abilityPreviewStyle);
             }

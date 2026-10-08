@@ -264,7 +264,8 @@ namespace ShardsOfTheLimit.Presentation
             IReadOnlyList<AbilityDefinition> abilities = definitionsByUnit.TryGetValue(active, out UnitDefinition definition)
                 ? definition.Abilities
                 : new AbilityDefinition[0];
-            bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player;
+            bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
+            bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
             float count = abilities.Count + 1;
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
@@ -317,9 +318,11 @@ namespace ShardsOfTheLimit.Presentation
                 x += AbilityButtonSize + 8f;
             }
 
-            GUI.enabled = canAct;
+            GUI.enabled = canAct || facingStep && !isBusy;
             var endTurn = new Rect(panel.xMax - 140f, y + 6f, 130f, AbilityButtonSize - 12f);
-            if (GUI.Button(endTurn, "Конец хода\n(Space)", hudButtonStyle)) EndPlayerTurn();
+            if (facingStep) Fill(new Rect(endTurn.x - 2f, endTurn.y - 2f, endTurn.width + 4f, endTurn.height + 4f), new Color(1f, 0.85f, 0.3f));
+            string endLabel = facingStep ? "Подтвердить\nнаправление" : "Конец хода\n(Space)";
+            if (GUI.Button(endTurn, endLabel, hudButtonStyle)) EndPlayerTurn();
             GUI.enabled = true;
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
@@ -425,6 +428,11 @@ namespace ShardsOfTheLimit.Presentation
 
             bool canAct = !isBusy && !battleEnded && !showOnboarding && turns?.CurrentUnit?.ControlType == ControlType.Player &&
                           selectedUnit == turns.CurrentUnit;
+            if (canAct && mode == InteractionMode.Facing)
+            {
+                UpdateFacingPointer(mouse, overHud);
+                return;
+            }
             if (cell != hoveredCell)
             {
                 hoveredCell = cell;
@@ -457,6 +465,33 @@ namespace ShardsOfTheLimit.Presentation
         }
 
         private Vector3 rightPressPosition;
+        private Vector3 lastFacingPointer;
+
+        /// <summary>Facing step: the side the pointer is on (around the unit) becomes the front; a click confirms.</summary>
+        private void UpdateFacingPointer(Vector3 mouse, bool overHud)
+        {
+            if (overHud || battleCamera == null || selectedUnit == null) return;
+            // Only a moving pointer re-aims; a resting cursor must not override a keyboard or button choice.
+            bool pointerMoved = (mouse - lastFacingPointer).sqrMagnitude > 4f;
+            lastFacingPointer = mouse;
+            var ground = new Plane(Vector3.up, UnitWorldPosition(selectedUnit.Cell) - Vector3.up * 0.6f);
+            Ray ray = battleCamera.ScreenPointToRay(mouse);
+            if (pointerMoved && ground.Raycast(ray, out float distance))
+            {
+                Vector3 offset = ray.GetPoint(distance) - UnitWorldPosition(selectedUnit.Cell);
+                if (new Vector2(offset.x, offset.z).sqrMagnitude > 0.04f)
+                {
+                    GridCoordinate direction = Mathf.Abs(offset.x) >= Mathf.Abs(offset.z)
+                        ? new GridCoordinate(offset.x > 0 ? 1 : -1, 0)
+                        : new GridCoordinate(0, offset.z > 0 ? 1 : -1);
+                    if (direction != facingPreview) PreviewFacing(direction);
+                }
+            }
+
+            if (Input.GetMouseButtonDown(0)) EndPlayerTurn();
+            if (Input.GetMouseButtonDown(1)) rightPressPosition = mouse;
+            if (Input.GetMouseButtonUp(1) && (mouse - rightPressPosition).sqrMagnitude < 36f) CancelFacing();
+        }
 
         private void PreviewHoveredCell()
         {

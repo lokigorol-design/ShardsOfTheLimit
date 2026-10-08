@@ -55,7 +55,7 @@ namespace ShardsOfTheLimit.Tests
             CombatUnitView blazeView = unitViews.Single(view => view.Unit.DefinitionId == "blaze-worm");
             Assert.That(blazeView.GetComponentsInChildren<Renderer>().Length, Is.GreaterThanOrEqualTo(1));
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(blazeView.transform.eulerAngles.x, 0f)), Is.LessThan(0.1f));
-            Assert.That(Mathf.Abs(Mathf.DeltaAngle(blazeView.transform.eulerAngles.y, 45f)), Is.LessThan(0.1f));
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(blazeView.transform.eulerAngles.y, 90f)), Is.LessThan(0.1f), "Players start facing +X.");
             Assert.That(Mathf.Abs(Mathf.DeltaAngle(blazeView.transform.eulerAngles.z, 0f)), Is.LessThan(0.1f),
                 "The authored model must use only a deliberate horizontal facing rotation.");
             Transform blazeVisual = blazeView.transform.GetChild(0);

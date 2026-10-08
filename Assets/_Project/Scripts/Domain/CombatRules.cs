@@ -135,6 +135,16 @@ namespace ShardsOfTheLimit.Domain
 
         public void MoveTo(GridCoordinate cell) => Cell = cell;
 
+        /// <summary>Cardinal direction the resonant faces (front). Chosen by the player at the end of each turn.</summary>
+        public GridCoordinate Facing { get; private set; } = new GridCoordinate(1, 0);
+
+        public void SetFacing(GridCoordinate direction)
+        {
+            if (Math.Abs(direction.X) + Math.Abs(direction.Y) != 1)
+                throw new ArgumentException("Facing must be one of the four cardinal directions.", nameof(direction));
+            Facing = direction;
+        }
+
         public MovementMode MovementMode { get; private set; } = MovementMode.Walk;
         /// <summary>AP one move costs: 1 by default, 2 for Deep Burrow.</summary>
         public int MovementActionCost { get; private set; } = 1;
@@ -541,6 +551,34 @@ namespace ShardsOfTheLimit.Domain
             return new CombatResourceState(
                 state.Health + result.HealthDelta,
                 state.Shield + result.ShieldDelta);
+        }
+    }
+
+    public enum AttackSide
+    {
+        Front,
+        Side,
+        Back
+    }
+
+    /// <summary>
+    /// Facing (front and back of a resonant). The direction from the target towards the attacker is reduced to its
+    /// dominant axis (X wins ties): the facing direction is the front, the opposite one is the back, the rest are sides.
+    /// No combat bonus is attached yet; the rules for back attacks are still to be decided.
+    /// </summary>
+    public static class FacingRules
+    {
+        public static GridCoordinate Towards(GridCoordinate from, GridCoordinate to) => CloudAreaEffect.DirectionFrom(from, to);
+
+        public static AttackSide GetSide(CombatUnit target, GridCoordinate attackerCell)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            if (attackerCell == target.Cell) return AttackSide.Front;
+            GridCoordinate towardsAttacker = Towards(target.Cell, attackerCell);
+            if (towardsAttacker == target.Facing) return AttackSide.Front;
+            return towardsAttacker.X == -target.Facing.X && towardsAttacker.Y == -target.Facing.Y
+                ? AttackSide.Back
+                : AttackSide.Side;
         }
     }
 

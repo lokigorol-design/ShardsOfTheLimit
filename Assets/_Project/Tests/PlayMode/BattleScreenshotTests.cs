@@ -46,6 +46,14 @@ namespace ShardsOfTheLimit.Tests
             yield return new WaitForSeconds(1.2f);
             yield return Capture("01b-idol-geyser-mark.png");
             Assert.That(controller.AreaEffects.PendingStrikes.Count, Is.EqualTo(1));
+            // Both AP spent: the turn stops at the facing step until the player confirms a direction.
+            yield return new WaitForSeconds(0.8f);
+            Assert.That(controller.ActiveUnit, Is.SameAs(idol), "The facing step waits for the player.");
+            Call(controller, "PreviewFacing", new GridCoordinate(0, 1));
+            yield return new WaitForSeconds(0.4f);
+            yield return Capture("01c-idol-facing.png");
+            controller.RequestEndTurn();
+            Assert.That(idol.Facing, Is.EqualTo(new GridCoordinate(0, 1)));
 
             yield return PassTurnsUntil(controller, "blightgullet");
             CombatUnit toad = controller.ActiveUnit;

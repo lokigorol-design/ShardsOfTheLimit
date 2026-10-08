@@ -151,7 +151,7 @@ namespace ShardsOfTheLimit.Presentation
             alphaMesh.MarkDynamic();
             additiveMesh = new Mesh { name = "VFX Additive Particles" };
             additiveMesh.MarkDynamic();
-            debrisMaterial = new Material(Shader.Find("Standard")) { name = "VFX Debris" };
+            debrisMaterial = new Material(BattleEnvironment.LitShader) { name = "VFX Debris" };
         }
 
         private void OnDestroy()
@@ -219,7 +219,9 @@ namespace ShardsOfTheLimit.Presentation
                 Renderer renderer = chunk.GetComponent<Renderer>();
                 renderer.sharedMaterial = debrisMaterial;
                 var block = new MaterialPropertyBlock();
-                block.SetColor("_Color", color * Random.Range(0.75f, 1.15f));
+                Color tint = color * Random.Range(0.75f, 1.15f);
+                block.SetColor("_Color", tint);
+                block.SetColor("_BaseColor", tint);
                 renderer.SetPropertyBlock(block);
                 Vector2 planar = Random.insideUnitCircle * speed * 0.55f;
                 debris.Add(new Debris

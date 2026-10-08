@@ -2,7 +2,9 @@
   "name": "ShardsOfTheLimit.Gameplay",
   "rootNamespace": "ShardsOfTheLimit",
   "references": [
-    "ShardsOfTheLimit.Domain"
+    "ShardsOfTheLimit.Domain",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
   ],
   "autoReferenced": true
 }

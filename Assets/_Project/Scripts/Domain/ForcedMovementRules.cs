@@ -34,6 +34,66 @@ namespace ShardsOfTheLimit.Domain
             return new PushResult(target, path, collision);
         }
 
+        /// <summary>
+        /// Storm Magnet: the first resonant on a straight line from <paramref name="point"/> within
+        /// <paramref name="reach"/> cells (nearest first; ties in the order +X, −X, +Y, −Y). Null when nobody is in reach.
+        /// </summary>
+        public static CombatUnit FindFirstOnLines(
+            TacticalGrid grid,
+            GridCoordinate point,
+            int reach,
+            IEnumerable<CombatUnit> units)
+        {
+            var candidates = new List<CombatUnit>();
+            foreach (CombatUnit unit in units) if (!unit.IsDefeated && unit.Cell != point) candidates.Add(unit);
+            var directions = new[] { new GridCoordinate(1, 0), new GridCoordinate(-1, 0), new GridCoordinate(0, 1), new GridCoordinate(0, -1) };
+            for (int step = 1; step <= reach; step++)
+            {
+                foreach (GridCoordinate direction in directions)
+                {
+                    var cell = new GridCoordinate(point.X + direction.X * step, point.Y + direction.Y * step);
+                    // An obstacle between the point and the target cuts that line.
+                    bool blocked = false;
+                    for (int inner = 1; inner < step; inner++)
+                    {
+                        var between = new GridCoordinate(point.X + direction.X * inner, point.Y + direction.Y * inner);
+                        if (!grid.Contains(between) || !grid.GetCell(between).IsWalkable ||
+                            candidates.Exists(unit => unit.Cell == between)) blocked = true;
+                    }
+
+                    if (blocked) continue;
+                    CombatUnit hit = candidates.Find(unit => unit.Cell == cell);
+                    if (hit != null) return hit;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Pull straight towards a surface point; on a floor point the target ends on the point itself.</summary>
+        public static PushResult PullToPoint(TacticalGrid grid, CombatUnit target, GridCoordinate point,
+            GridCoordinate targetPosition, Func<GridCoordinate, bool> isOccupied)
+        {
+            var path = new List<GridCoordinate> { targetPosition };
+            var current = targetPosition;
+            GridCoordinate? collision = null;
+            while (current != point)
+            {
+                var direction = CloudAreaEffect.DirectionFrom(current, point);
+                var next = new GridCoordinate(current.X + direction.X, current.Y + direction.Y);
+                if ((isOccupied?.Invoke(next) ?? false) || !grid.TryGetMovementCost(current, next, out _))
+                {
+                    collision = next;
+                    break;
+                }
+
+                path.Add(next);
+                current = next;
+            }
+
+            return new PushResult(target, path, collision);
+        }
+
         public static PushResult Push(
             TacticalGrid grid,
             CombatUnit target,

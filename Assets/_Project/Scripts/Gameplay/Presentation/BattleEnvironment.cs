@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace ShardsOfTheLimit.Presentation
 {
@@ -16,6 +17,17 @@ namespace ShardsOfTheLimit.Presentation
         private static Texture2D groundNormal;
         private static Material rockMaterial;
 
+        /// <summary>URP Lit when the project runs on URP, Standard otherwise; both read colour and textures the same way.</summary>
+        public static Shader LitShader =>
+            (GraphicsSettings.currentRenderPipeline != null ? Shader.Find("Universal Render Pipeline/Lit") : null) ??
+            Shader.Find("Standard");
+
+        private static void SetSmoothness(Material material, float value)
+        {
+            material.SetFloat("_Glossiness", value);
+            material.SetFloat("_Smoothness", value);
+        }
+
         public static void ConfigureLighting(Light light, Camera camera)
         {
             light.type = LightType.Directional;
@@ -27,8 +39,8 @@ namespace ShardsOfTheLimit.Presentation
             light.shadowNormalBias = 0.3f;
             light.transform.rotation = Quaternion.Euler(48f, -38f, 0f);
 
-            QualitySettings.shadows = ShadowQuality.All;
-            QualitySettings.shadowResolution = ShadowResolution.High;
+            QualitySettings.shadows = UnityEngine.ShadowQuality.All;
+            QualitySettings.shadowResolution = UnityEngine.ShadowResolution.High;
             QualitySettings.shadowDistance = 70f;
             QualitySettings.shadowCascades = 2;
             QualitySettings.antiAliasing = 4;
@@ -57,18 +69,36 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             RenderSettings.sun = light;
+            ConfigurePostProcessing(camera);
+        }
+
+        /// <summary>URP only: post-processing on the battle camera and the global volume (bloom, ACES, grading, vignette).</summary>
+        private static void ConfigurePostProcessing(Camera camera)
+        {
+            if (camera == null || GraphicsSettings.currentRenderPipeline == null) return;
+            UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
+            data.renderPostProcessing = true;
+            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            data.antialiasingQuality = AntialiasingQuality.High;
+            data.renderShadows = true;
+            var profile = Resources.Load<VolumeProfile>("Prototype/Rendering/BattlePostProcess");
+            if (profile == null || Object.FindAnyObjectByType<Volume>() != null) return;
+            var volume = new GameObject("Battle Post Process").AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = 10f;
+            volume.sharedProfile = profile;
         }
 
         /// <summary>Stone material for one cell column; its colour is the tint the highlights replace.</summary>
         public static Material CreateCellMaterial(bool walkable)
         {
             EnsureTextures();
-            var material = new Material(Shader.Find("Standard")) { name = walkable ? "Cell Stone" : "Cell Basalt" };
+            var material = new Material(LitShader) { name = walkable ? "Cell Stone" : "Cell Basalt" };
             material.mainTexture = stoneAlbedo;
             material.SetTexture("_BumpMap", stoneNormal);
             material.SetFloat("_BumpScale", 0.9f);
             material.EnableKeyword("_NORMALMAP");
-            material.SetFloat("_Glossiness", walkable ? 0.12f : 0.28f);
+            SetSmoothness(material, walkable ? 0.12f : 0.28f);
             material.SetFloat("_Metallic", 0f);
             return material;
         }
@@ -83,13 +113,13 @@ namespace ShardsOfTheLimit.Presentation
             ground.transform.SetParent(parent, false);
             ground.transform.position = new Vector3(0f, y, 0f);
             ground.transform.localScale = new Vector3(8f, 1f, 8f);
-            var material = new Material(Shader.Find("Standard")) { name = "Ground Dirt" };
+            var material = new Material(LitShader) { name = "Ground Dirt" };
             material.mainTexture = groundAlbedo;
             material.mainTextureScale = new Vector2(6f, 6f);
             material.SetTexture("_BumpMap", groundNormal);
             material.EnableKeyword("_NORMALMAP");
             material.color = new Color(0.36f, 0.33f, 0.27f);
-            material.SetFloat("_Glossiness", 0.05f);
+            SetSmoothness(material, 0.05f);
             ground.GetComponent<Renderer>().sharedMaterial = material;
             return ground;
         }
@@ -130,13 +160,13 @@ namespace ShardsOfTheLimit.Presentation
             {
                 if (rockMaterial != null) return rockMaterial;
                 EnsureTextures();
-                rockMaterial = new Material(Shader.Find("Standard")) { name = "Rock" };
+                rockMaterial = new Material(LitShader) { name = "Rock" };
                 rockMaterial.mainTexture = stoneAlbedo;
                 rockMaterial.mainTextureScale = new Vector2(2f, 2f);
                 rockMaterial.SetTexture("_BumpMap", stoneNormal);
                 rockMaterial.EnableKeyword("_NORMALMAP");
                 rockMaterial.color = new Color(0.46f, 0.43f, 0.4f);
-                rockMaterial.SetFloat("_Glossiness", 0.18f);
+                SetSmoothness(rockMaterial, 0.18f);
                 return rockMaterial;
             }
         }

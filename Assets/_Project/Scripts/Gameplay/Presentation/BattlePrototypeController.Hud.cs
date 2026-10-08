@@ -51,6 +51,8 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             if (burningIcon != null) statusIcons[BurningCalculator.ResistanceId] = burningIcon;
+            Sprite geyser = Resources.Load<AbilityDefinition>("Prototype/Abilities/FireGeyser")?.Icon;
+            if (geyser != null) statusIcons["GEYSER"] = geyser;
         }
 
         private void OnGUI()

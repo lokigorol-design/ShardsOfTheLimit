@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000004, type: 3}
+  m_Name: PrimalIdol
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.UnitDefinition
+  stableId: primal-idol
+  displayName: Primal Idol
+  portrait: {fileID: 21300000, guid: b382ecb07e0462e43a4f85cb2a9f444e, type: 3}
+  visualPrefab: {fileID: 5244732837482662071, guid: 70ed47c6192ce5f4bb1253fee6dc141c, type: 3}
+  visualMaterial: {fileID: 2100000, guid: a59cf37739b13974dabf0983045ba480, type: 2}
+  visualRotationOffset: {x: 0, y: 0, z: 0}
+  maximumHealth: 90
+  maximumShield: 60
+  attack: 17
+  defense: 3
+  speed: 10
+  movementRange: 2
+  movementMode: 0
+  movementActionCost: 1
+  periodicResistances: []
+  abilities:
+  - {fileID: 11400000, guid: 7a270a0e145140146882d2eeaff495b0, type: 2}
+  - {fileID: 11400000, guid: 827e7b8cea6137540bd0aa980eb71ffb, type: 2}
+  - {fileID: 11400000, guid: 0c201190ba6097441a39878bfbda5575, type: 2}
+  - {fileID: 11400000, guid: f94d98e2211a93c43bdc72d1b6d4a215, type: 2}
+  passiveModifiers: {fileID: 0}

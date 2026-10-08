@@ -87,6 +87,52 @@ namespace ShardsOfTheLimit.Domain
         public int ApplyStacks(int amount) => Math.Max(1, (int)Math.Ceiling(amount * CloudStacksMultiplier) + CloudStacksBonus);
     }
 
+    /// <summary>
+    /// Delayed ability (tag «Отложенное», e.g. Fire Geyser): a visible mark that strikes its cells after a delay.
+    /// Damage uses the creator's ATK captured at cast time.
+    /// </summary>
+    public sealed class DelayedStrike
+    {
+        public DelayedStrike(CombatUnit owner, string sourceAbilityId, IEnumerable<GridCoordinate> cells, long strikeTick,
+            double rawDamage, int burnPower, int burnDurationPulses)
+        {
+            Owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            SourceAbilityId = sourceAbilityId;
+            Cells = cells.Distinct().ToArray();
+            StrikeTick = strikeTick;
+            RawDamage = rawDamage;
+            BurnPower = burnPower;
+            BurnDurationPulses = Math.Max(1, burnDurationPulses);
+        }
+
+        public CombatUnit Owner { get; }
+        public string SourceAbilityId { get; }
+        public IReadOnlyCollection<GridCoordinate> Cells { get; }
+        public long StrikeTick { get; }
+        public double RawDamage { get; }
+        public int BurnPower { get; }
+        public int BurnDurationPulses { get; }
+    }
+
+    /// <summary>Trap object (tag «Ловушка», e.g. Lift Trap): fires on the first resonant entering its cell, allies included.</summary>
+    public sealed class TrapObject
+    {
+        public TrapObject(CombatUnit owner, string sourceAbilityId, GridCoordinate cell, long expireTick, int fallHealthPercent)
+        {
+            Owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            SourceAbilityId = sourceAbilityId;
+            Cell = cell;
+            ExpireTick = expireTick;
+            FallHealthPercent = Math.Max(0, fallHealthPercent);
+        }
+
+        public CombatUnit Owner { get; }
+        public string SourceAbilityId { get; }
+        public GridCoordinate Cell { get; }
+        public long ExpireTick { get; }
+        public int FallHealthPercent { get; }
+    }
+
     /// <summary>Battle-owned areas and global stack statuses. Scheduled by the existing timeline.</summary>
     public sealed class AreaEffectWorld
     {
@@ -94,7 +140,45 @@ namespace ShardsOfTheLimit.Domain
         private readonly IReadOnlyList<CombatUnit> units;
         private readonly List<CloudAreaEffect> clouds = new List<CloudAreaEffect>();
         private readonly Dictionary<CombatUnit, PassiveModifiers> passives = new Dictionary<CombatUnit, PassiveModifiers>();
+        private readonly List<DelayedStrike> strikes = new List<DelayedStrike>();
+        private readonly List<TrapObject> traps = new List<TrapObject>();
+        private readonly List<DelayedStrike> firedStrikes = new List<DelayedStrike>();
         public IReadOnlyList<CloudAreaEffect> Clouds => clouds;
+        public IReadOnlyList<DelayedStrike> PendingStrikes => strikes;
+        public IReadOnlyList<TrapObject> Traps => traps;
+        public void AddStrike(DelayedStrike strike) => strikes.Add(strike);
+        public void AddTrap(TrapObject trap)
+        {
+            traps.RemoveAll(existing => existing.Cell == trap.Cell);
+            traps.Add(trap);
+        }
+
+        public TrapObject TrapAt(GridCoordinate cell) => traps.FirstOrDefault(trap => trap.Cell == cell);
+
+        /// <summary>Strikes that fired since the last call, for presentation.</summary>
+        public IReadOnlyList<DelayedStrike> TakeFiredStrikes()
+        {
+            DelayedStrike[] fired = firedStrikes.ToArray();
+            firedStrikes.Clear();
+            return fired;
+        }
+
+        /// <summary>
+        /// A resonant entered a trapped cell: the trap is spent. A floor Lift Trap throws it up 4 units;
+        /// the fall costs <see cref="TrapObject.FallHealthPercent"/>% of maximum health, Defense does not apply.
+        /// </summary>
+        public DamageResult TriggerTrap(CombatUnit unit, GridCoordinate cell)
+        {
+            TrapObject trap = TrapAt(cell);
+            if (trap == null || unit == null || unit.IsDefeated) return null;
+            traps.Remove(trap);
+            DamageResult fall = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState,
+                unit.MaximumHealth * trap.FallHealthPercent / 100d, FallResistanceId);
+            CombatEffectResolver.Apply(new[] { fall });
+            return fall;
+        }
+
+        public const string FallResistanceId = "FALL";
         public AreaEffectWorld(TacticalGrid grid, IReadOnlyList<CombatUnit> units) { this.grid = grid; this.units = units; }
         public void Register(CombatUnit unit, PassiveModifiers modifiers) => passives[unit] = modifiers;
         public PassiveModifiers GetModifiers(CombatUnit unit) => passives.TryGetValue(unit, out var value) ? value : new PassiveModifiers();
@@ -108,6 +192,8 @@ namespace ShardsOfTheLimit.Domain
                 direction, height, tick, GetModifiers(owner).ApplyStacks(rules.StacksPerTick));
         public void Add(CloudAreaEffect cloud) { clouds.Add(cloud); }
         public long NextEventTick => clouds.SelectMany(c => new[] { c.NextPulseTick, c.NextMoveTick, c.ExpireTick })
+            .Concat(strikes.Select(s => s.StrikeTick))
+            .Concat(traps.Select(trap => trap.ExpireTick))
             .Concat(units.Where(u => !u.IsDefeated).SelectMany(u => u.Statuses.Values.SelectMany(s =>
                 s.Rules.Pulses ? new[] { s.NextPulseTick, s.ExpireTick } : new[] { s.ExpireTick })))
             .DefaultIfEmpty(long.MaxValue).Min();
@@ -146,6 +232,23 @@ namespace ShardsOfTheLimit.Domain
                 if (cloud.NextMoveTick == tick) { cloud.Move(grid); cloud.NextMoveTick += cloud.Rules.MovementInterval; }
                 if (cloud.ExpireTick <= tick) clouds.Remove(cloud);
             }
+            foreach (DelayedStrike strike in strikes.Where(s => s.StrikeTick <= tick).ToArray())
+            {
+                strikes.Remove(strike);
+                firedStrikes.Add(strike);
+                foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && strike.Cells.Contains(u.Cell)).ToArray())
+                {
+                    DamageResult hit = CombatEffectCalculator.Damage(unit, unit.ResourceState, strike.RawDamage);
+                    CombatEffectResolver.Apply(new[] { hit });
+                    results.Add(hit);
+                    if (unit.IsDefeated || strike.BurnPower <= 0) continue;
+                    BurnAppliedResult burn = BurningCalculator.Apply(unit, unit.BurningState, strike.BurnPower,
+                        strike.BurnDurationPulses, tick, unit.GetMechanicStacks(StatusMechanic.Oil));
+                    CombatEffectResolver.Apply(new ICombatEffectResult[] { burn });
+                    results.Add(burn);
+                }
+            }
+            traps.RemoveAll(trap => trap.ExpireTick <= tick);
             return results;
         }
         public IReadOnlyList<ICombatEffectResult> OnActivation(CombatUnit unit)
@@ -159,6 +262,8 @@ namespace ShardsOfTheLimit.Domain
         }
         public IEnumerable<TimelineEvent> PreviewEvents(long after, int count)
         {
+            foreach (DelayedStrike strike in strikes)
+                if (strike.StrikeTick > after) yield return new TimelineEvent(strike.StrikeTick, TimelineEventKind.StatusPulse, strike.Owner, "GEYSER");
             foreach (var cloud in clouds)
             {
                 for (long tick = cloud.NextPulseTick, n = 0; tick <= cloud.ExpireTick && n < count; tick += cloud.Rules.PulseInterval, n++)

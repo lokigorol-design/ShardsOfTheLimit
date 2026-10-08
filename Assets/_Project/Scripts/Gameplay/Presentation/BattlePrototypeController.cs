@@ -204,7 +204,7 @@ namespace ShardsOfTheLimit.Presentation
                 return false;
             }
 
-            IReadOnlyList<GridCoordinate> path = movementMap?.GetPath(destination) ?? Array.Empty<GridCoordinate>();
+            IReadOnlyList<GridCoordinate> path = StopAtTrap(movementMap?.GetPath(destination) ?? Array.Empty<GridCoordinate>());
             if (path.Count <= 1) return false;
 
             selectedDestination = destination;
@@ -237,6 +237,7 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             UpdateCameraControls();
+            EmitFieldMarks();
 
             if (showOnboarding)
             {
@@ -286,6 +287,20 @@ namespace ShardsOfTheLimit.Presentation
             UpdatePointer();
         }
 
+        private float fieldMarkBudget;
+
+        /// <summary>Pending Fire Geyser marks and Lift Traps stay visible to everyone until they fire or expire.</summary>
+        private void EmitFieldMarks()
+        {
+            if (areaEffects == null) return;
+            fieldMarkBudget += Time.deltaTime * 12f;
+            if (fieldMarkBudget < 1f) return;
+            fieldMarkBudget -= 1f;
+            foreach (DelayedStrike strike in areaEffects.PendingStrikes)
+                foreach (GridCoordinate cell in strike.Cells) AbilityVfx.GeyserMark(EffectWorldPosition(cell));
+            foreach (TrapObject trap in areaEffects.Traps) AbilityVfx.TrapMark(EffectWorldPosition(trap.Cell));
+        }
+
         private void LoadDefinitions()
         {
             playerDefinitions = new[]
@@ -293,7 +308,8 @@ namespace ShardsOfTheLimit.Presentation
                 Resources.Load<UnitDefinition>(blightgulletShowcase ? "Prototype/Units/Blightgullet" : "Prototype/Units/BlazeWorm"),
                 // The main battle fields both authored resonants: the worm and the toad.
                 Resources.Load<UnitDefinition>(blightgulletShowcase ? "Prototype/Units/RangerEcho" : "Prototype/Units/Blightgullet"),
-                Resources.Load<UnitDefinition>("Prototype/Units/SkirmisherEcho")
+                // The third authored resonant: Primal Idol replaces the technical skirmisher in the main battle.
+                Resources.Load<UnitDefinition>(blightgulletShowcase ? "Prototype/Units/SkirmisherEcho" : "Prototype/Units/PrimalIdol")
             };
             opponentDefinitions = new[]
             {
@@ -801,6 +817,8 @@ namespace ShardsOfTheLimit.Presentation
                 $"{selectedUnit.DisplayName} moves {start} → {path[path.Count - 1]} " +
                 $"({movementCost}/{MovementBudget(selectedUnit)} movement, -{selectedUnit.MovementActionCost} AP)");
             yield return AnimateMovement(selectedUnit, path);
+            yield return TriggerTrapIfAny(selectedUnit, new[] { selectedUnit.Cell });
+            if (EvaluateBattleEnd()) yield break;
 
             selectedUnit.CurrentAction = "Move complete";
             resolvedActions++;
@@ -1040,11 +1058,12 @@ namespace ShardsOfTheLimit.Presentation
             foreach (PushResult push in results.OfType<PushResult>().Where(result => result.StepsMoved > 0))
             {
                 yield return AnimateForcedMovement(push);
+                yield return TriggerTrapIfAny(push.Target, push.Path.Skip(1));
             }
 
             foreach (TerrainChangeResult terrainResult in resolution.TerrainResults)
             {
-                RefreshCellVisual(terrainResult.Coordinate);
+                yield return AnimateCellRise(terrainResult);
                 Vector3 labelPosition = EffectWorldPosition(terrainResult.Coordinate) + Vector3.up * 0.35f;
                 feedback.AddFloatingText(
                     labelPosition,
@@ -1058,6 +1077,83 @@ namespace ShardsOfTheLimit.Presentation
                     yield return AnimateUnitToCurrentCell(unit);
                 }
             }
+        }
+
+        /// <summary>A walking path ends on the first trapped cell: the trap stops the resonant there.</summary>
+        private IReadOnlyList<GridCoordinate> StopAtTrap(IReadOnlyList<GridCoordinate> path)
+        {
+            if (areaEffects == null || path.Count < 2) return path;
+            for (int index = 1; index < path.Count; index++)
+            {
+                if (areaEffects.TrapAt(path[index]) != null) return path.Take(index + 1).ToArray();
+            }
+
+            return path;
+        }
+
+        /// <summary>Fires the first trap among <paramref name="cells"/> on the unit that entered it.</summary>
+        private IEnumerator TriggerTrapIfAny(CombatUnit unit, IEnumerable<GridCoordinate> cells)
+        {
+            if (areaEffects == null || unit == null || unit.IsDefeated) yield break;
+            GridCoordinate? trapped = cells.Cast<GridCoordinate?>().FirstOrDefault(cell => areaEffects.TrapAt(cell.Value) != null);
+            if (!trapped.HasValue) yield break;
+            DamageResult fall = areaEffects.TriggerTrap(unit, trapped.Value);
+            if (fall == null) yield break;
+            feedback.AddLog($"{unit.DisplayName} triggers Lift Trap at {trapped.Value}: thrown up, " +
+                            $"{-fall.ShieldDelta} shield damage, {-fall.HealthDelta} health damage");
+            if (unitViews.TryGetValue(unit, out CombatUnitView view))
+            {
+                yield return AbilityVfx.LiftTrapToss(view.transform, EffectWorldPosition(trapped.Value));
+                Vector3 label = view.transform.position + Vector3.up * 0.75f;
+                if (fall.ShieldDelta < 0) feedback.AddFloatingText(label, $"{fall.ShieldDelta} SHIELD", new Color(0.2f, 0.75f, 1f));
+                if (fall.HealthDelta < 0) feedback.AddFloatingText(label + Vector3.up * 0.22f, $"{fall.HealthDelta} HP", new Color(1f, 0.28f, 0.2f));
+                if (unit.IsDefeated)
+                {
+                    AbilityVfx.Defeat(view.transform.position);
+                    view.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        /// <summary>Earth Pillar and other terrain: the column grinds to its new height, units ride along.</summary>
+        private IEnumerator AnimateCellRise(TerrainChangeResult change)
+        {
+            if (!cellViews.TryGetValue(change.Coordinate, out CellView view))
+            {
+                RefreshCellVisual(change.Coordinate);
+                yield break;
+            }
+
+            GetCellColumnGeometry(change.PreviousHeight, out float fromCenter, out float fromHeight);
+            GetCellColumnGeometry(change.NewHeight, out float toCenter, out float toHeight);
+            AbilityVfx.PillarRumble(EffectWorldPosition(change.Coordinate));
+            CombatUnit rider = units.FirstOrDefault(unit => !unit.IsDefeated && unit.Cell == change.Coordinate);
+            Transform riderView = rider != null && unitViews.TryGetValue(rider, out CombatUnitView riderBody) ? riderBody.transform : null;
+            float riderStart = riderView != null ? riderView.position.y : 0f;
+            float rise = (change.NewHeight - change.PreviousHeight) * HeightStep;
+            float elapsed = 0f;
+            const float duration = 0.45f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                Vector3 position = view.transform.position;
+                position.y = Mathf.Lerp(fromCenter, toCenter, t);
+                view.transform.position = position;
+                Vector3 scale = view.transform.localScale;
+                scale.y = Mathf.Lerp(fromHeight, toHeight, t);
+                view.transform.localScale = scale;
+                if (riderView != null)
+                {
+                    Vector3 riderPosition = riderView.position;
+                    riderPosition.y = riderStart + rise * t;
+                    riderView.position = riderPosition;
+                }
+
+                yield return null;
+            }
+
+            RefreshCellVisual(change.Coordinate);
         }
 
         private IEnumerator AnimateUnitToCurrentCell(CombatUnit unit)
@@ -1202,6 +1298,8 @@ namespace ShardsOfTheLimit.Presentation
         {
             Transform sourceView = unitViews.TryGetValue(source, out CombatUnitView view) ? view.transform : null;
             CombatUnit targetUnit = units.FirstOrDefault(unit => !unit.IsDefeated && unit.Cell == target);
+            PullToPointEffectDefinition magnet = ability.Effects.OfType<PullToPointEffectDefinition>().FirstOrDefault();
+            if (magnet != null) targetUnit = ForcedMovementCalculator.FindFirstOnLines(grid, target, magnet.reach, units);
             var cloudEffect = ability.Effects.OfType<CreateCloudEffectDefinition>().FirstOrDefault();
             var context = new AbilityVfxContext
             {
@@ -1214,7 +1312,8 @@ namespace ShardsOfTheLimit.Presentation
                     ? targetBody.transform
                     : null,
                 ImpactCells = impact.Select(EffectWorldPosition).ToArray(),
-                CloudColor = cloudEffect?.cloud != null ? cloudEffect.cloud.color : Color.green
+                CloudColor = cloudEffect?.cloud != null ? cloudEffect.cloud.color : Color.green,
+                Point = EffectWorldPosition(target)
             };
             if (AbilityVfx.TryCreate(ability.StableId, context, out IEnumerator signature))
             {
@@ -1232,6 +1331,12 @@ namespace ShardsOfTheLimit.Presentation
 
         private void PresentTimelineResults(IReadOnlyList<ICombatEffectResult> results)
         {
+            foreach (DelayedStrike strike in areaEffects?.TakeFiredStrikes() ?? Array.Empty<DelayedStrike>())
+            {
+                foreach (GridCoordinate cell in strike.Cells) AbilityVfx.GeyserEruption(EffectWorldPosition(cell));
+                feedback.AddLog($"Fire Geyser erupts at {string.Join(", ", strike.Cells)}");
+            }
+
             foreach (ICombatEffectResult tick in results)
             {
                 if (unitViews.TryGetValue(tick.Target, out CombatUnitView view))
@@ -1291,7 +1396,7 @@ namespace ShardsOfTheLimit.Presentation
                         .ThenBy(coordinate => coordinate.X)
                         .ThenBy(coordinate => coordinate.Y)
                         .First();
-                    IReadOnlyList<GridCoordinate> path = aiMovementMap.GetPath(destination);
+                    IReadOnlyList<GridCoordinate> path = StopAtTrap(aiMovementMap.GetPath(destination));
                     if (path.Count > 1 && unit.SpendActionPoints(unit.MovementActionCost))
                     {
                         int movementCost = MovementRules.PathCost(grid, selectedUnit, path);
@@ -1303,6 +1408,8 @@ namespace ShardsOfTheLimit.Presentation
                             $"({movementCost}/{MovementBudget(unit)} movement, -{unit.MovementActionCost} AP)");
                         RefreshHighlights();
                         yield return AnimateMovement(unit, path);
+                        yield return TriggerTrapIfAny(unit, new[] { unit.Cell });
+                        if (EvaluateBattleEnd()) yield break;
                         resolvedActions++;
                         feedback.AddLog($"{unit.DisplayName} reached {unit.Cell}");
                         selectedPath = Array.Empty<GridCoordinate>();

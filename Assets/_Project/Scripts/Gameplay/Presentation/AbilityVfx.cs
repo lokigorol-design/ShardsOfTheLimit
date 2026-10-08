@@ -14,6 +14,8 @@ namespace ShardsOfTheLimit.Presentation
         public Transform TargetView;
         public IReadOnlyList<Vector3> ImpactCells;
         public Color CloudColor = Color.green;
+        /// <summary>The chosen surface point (Primal Idol abilities target a point, not a unit).</summary>
+        public Vector3 Point;
     }
 
     /// <summary>
@@ -49,6 +51,18 @@ namespace ShardsOfTheLimit.Presentation
                 case "CorrosionCloud":
                 case "OilCloud":
                     routine = ExhaleCloud(context);
+                    return true;
+                case "StormMagnet":
+                    routine = StormMagnet(context);
+                    return true;
+                case "FireGeyser":
+                    routine = RuneCast(context, new Color(1f, 0.45f, 0.12f), 0.35f);
+                    return true;
+                case "EarthPillar":
+                    routine = RuneCast(context, new Color(0.95f, 0.65f, 0.25f), 0.2f);
+                    return true;
+                case "LiftTrap":
+                    routine = LiftTrapCast(context);
                     return true;
                 default:
                     routine = null;
@@ -255,6 +269,159 @@ namespace ShardsOfTheLimit.Presentation
             bloom.Velocity = Vector3.up * 0.15f;
             foreach (Vector3 cell in context.ImpactCells) vfx.Burst(cell + Vector3.up * 0.25f, 6, bloom, 0.35f);
             yield return new WaitForSeconds(0.2f);
+        }
+
+        private static readonly Color LightningColor = new Color(0.62f, 0.5f, 1f);
+        private static readonly Color WindColor = new Color(0.35f, 0.95f, 0.9f, 0.7f);
+
+        /// <summary>The totem's mask glows and a rune flares on the chosen point.</summary>
+        private static IEnumerator RuneCast(AbilityVfxContext context, Color color, float hold)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Vector3 mask = context.Source + Vector3.up * 0.5f;
+            ParticleSpec glow = ParticleSpec.Sparks(color, 0.8f, 0.12f);
+            glow.Gravity = Vector3.up * 0.6f;
+            vfx.Burst(mask, 18, glow, 0.15f);
+            yield return new WaitForSeconds(0.15f);
+            Rune(context.Point, color, 22);
+            yield return new WaitForSeconds(hold);
+        }
+
+        private static void Rune(Vector3 point, Color color, int count)
+        {
+            var spark = new ParticleSpec
+            {
+                StartColor = color,
+                EndColor = new Color(color.r, color.g, color.b, 0f),
+                StartSize = 0.14f,
+                EndSize = 0.05f,
+                Lifetime = 0.7f,
+                Hardness = 0.7f,
+                Additive = true
+            };
+            for (int index = 0; index < count; index++)
+            {
+                float angle = index * Mathf.PI * 2f / count;
+                var offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.38f;
+                VfxSystem.Instance.Emit(point + offset + Vector3.up * 0.05f, spark, Vector3.up * 0.4f);
+            }
+        }
+
+        /// <summary>Storm Magnet: a violet chain of lightning from the point to the first resonant on its line.</summary>
+        private static IEnumerator StormMagnet(AbilityVfxContext context)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            Rune(context.Point, LightningColor, 20);
+            if (context.TargetView == null)
+            {
+                yield return new WaitForSeconds(0.3f);
+                yield break;
+            }
+
+            var boltObject = new GameObject("VFX Lightning");
+            LineRenderer bolt = boltObject.AddComponent<LineRenderer>();
+            bolt.material = new Material(Shader.Find("Sprites/Default"));
+            bolt.startColor = new Color(0.85f, 0.8f, 1f);
+            bolt.endColor = LightningColor;
+            bolt.startWidth = 0.09f;
+            bolt.endWidth = 0.05f;
+            bolt.positionCount = 10;
+            Vector3 from = context.Point + Vector3.up * 0.3f;
+            yield return Animate(0.45f, t =>
+            {
+                Vector3 to = context.TargetView.position + Vector3.up * 0.3f;
+                for (int index = 0; index < bolt.positionCount; index++)
+                {
+                    float k = index / (bolt.positionCount - 1f);
+                    Vector3 jitter = index == 0 || index == bolt.positionCount - 1 ? Vector3.zero : Random.insideUnitSphere * 0.14f;
+                    bolt.SetPosition(index, Vector3.Lerp(from, to, k) + jitter);
+                }
+
+                if (Random.value < 0.5f)
+                    vfx.Emit(Vector3.Lerp(from, to, Random.value), ParticleSpec.Sparks(LightningColor, 1.4f, 0.07f));
+            });
+            vfx.Burst(context.TargetView.position, 16, ParticleSpec.Sparks(new Color(0.8f, 0.75f, 1f), 2.4f, 0.08f));
+            vfx.Shake(0.05f, 0.12f);
+            Object.Destroy(bolt.material);
+            Object.Destroy(boltObject);
+        }
+
+        private static IEnumerator LiftTrapCast(AbilityVfxContext context)
+        {
+            yield return RuneCast(context, WindColor, 0.05f);
+            ParticleSpec swirl = ParticleSpec.Smoke(WindColor, 0.35f, 0.8f);
+            swirl.Velocity = Vector3.up * 1.4f;
+            for (int index = 0; index < 24; index++)
+            {
+                float angle = index * 0.6f;
+                VfxSystem.Instance.Emit(context.Point + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.3f, swirl,
+                    new Vector3(-Mathf.Sin(angle), 1.2f, Mathf.Cos(angle)));
+            }
+
+            yield return new WaitForSeconds(0.25f);
+        }
+
+        /// <summary>Pending Fire Geyser mark: a smouldering ring that everyone can see.</summary>
+        public static void GeyserMark(Vector3 point)
+        {
+            Rune(point, new Color(1f, 0.4f, 0.1f), 3);
+            if (Random.value < 0.3f) VfxSystem.Instance.Emit(point + Vector3.up * 0.1f, ParticleSpec.Smoke(new Color(0.25f, 0.2f, 0.18f, 0.5f), 0.35f, 0.9f));
+        }
+
+        /// <summary>Fire Geyser fires: a column of flame shoots up from the point.</summary>
+        public static void GeyserEruption(Vector3 point)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            for (int index = 0; index < 60; index++)
+            {
+                ParticleSpec flame = ParticleSpec.Flame(0.55f);
+                flame.Lifetime = 0.7f;
+                vfx.Emit(point + Random.insideUnitSphere * 0.15f, flame, Vector3.up * Random.Range(2.5f, 5f) + Random.insideUnitSphere * 0.4f);
+            }
+
+            vfx.Burst(point, 30, ParticleSpec.Sparks(new Color(1f, 0.7f, 0.25f), 4f));
+            vfx.Burst(point + Vector3.up * 1.4f, 10, ParticleSpec.Smoke(new Color(0.2f, 0.18f, 0.17f, 0.55f), 1f, 1.6f), 0.3f);
+            vfx.Shake(0.1f, 0.25f);
+        }
+
+        /// <summary>Lift Trap waiting on a cell: a soft turquoise eddy.</summary>
+        public static void TrapMark(Vector3 point)
+        {
+            float angle = Time.time * 4f + Random.value;
+            ParticleSpec eddy = ParticleSpec.Smoke(WindColor, 0.2f, 0.6f);
+            eddy.Velocity = Vector3.up * 0.4f;
+            VfxSystem.Instance.Emit(point + new Vector3(Mathf.Cos(angle), 0.05f, Mathf.Sin(angle)) * 0.3f, eddy);
+        }
+
+        /// <summary>Lift Trap fires: a tornado throws the victim up; it crashes back down.</summary>
+        public static IEnumerator LiftTrapToss(Transform victim, Vector3 ground)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            ParticleSpec swirl = ParticleSpec.Smoke(WindColor, 0.5f, 0.9f);
+            for (int index = 0; index < 40; index++)
+            {
+                float angle = index * 0.5f;
+                vfx.Emit(ground + new Vector3(Mathf.Cos(angle), index * 0.05f, Mathf.Sin(angle)) * 0.35f, swirl,
+                    new Vector3(-Mathf.Sin(angle) * 1.5f, 2.2f, Mathf.Cos(angle) * 1.5f));
+            }
+
+            if (victim == null) yield break;
+            Vector3 start = victim.position;
+            yield return Animate(0.35f, t => victim.position = start + Vector3.up * Mathf.Sin(t * Mathf.PI * 0.5f) * 2.2f);
+            yield return Animate(0.22f, t => victim.position = start + Vector3.up * (1f - t * t) * 2.2f);
+            victim.position = start;
+            vfx.Ring(ground, 18, 2f, ParticleSpec.Smoke(DustColor, 0.5f, 0.8f));
+            vfx.Chunks(ground, 6, RockColor, 2f);
+            vfx.Shake(0.1f, 0.2f);
+        }
+
+        /// <summary>Earth Pillar: the column grinds upward with dust and stones.</summary>
+        public static void PillarRumble(Vector3 ground)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            vfx.Ring(ground, 20, 1.8f, ParticleSpec.Smoke(DustColor, 0.55f, 1f));
+            vfx.Chunks(ground, 10, new Color(0.62f, 0.48f, 0.3f), 2.6f);
+            vfx.Shake(0.09f, 0.35f);
         }
 
         /// <summary>Deep Burrow: the ground cracks, the worm sinks, a dust line runs underground, it erupts.</summary>

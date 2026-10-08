@@ -31,6 +31,22 @@ namespace ShardsOfTheLimit.Tests
             yield return new WaitForSeconds(0.3f);
             yield return Capture("01-start.png");
 
+            yield return PassTurnsUntil(controller, "primal-idol");
+            CombatUnit idol = controller.ActiveUnit;
+            Call(controller, "BeginAbilityTargeting", AbilityIndex(controller, idol, "EarthPillar"));
+            Call(controller, "HandleCellChoice", new GridCoordinate(0, 0));
+            Call(controller, "ConfirmCurrentChoice");
+            yield return new WaitForSeconds(0.35f);
+            yield return Capture("01a-idol-earth-pillar.png");
+            yield return new WaitForSeconds(1.2f);
+            Assert.That(idol.CurrentActionPoints, Is.EqualTo(1), "Earth Pillar spends one AP.");
+            Call(controller, "BeginAbilityTargeting", AbilityIndex(controller, idol, "FireGeyser"));
+            Call(controller, "HandleCellChoice", new GridCoordinate(1, 3));
+            Call(controller, "ConfirmCurrentChoice");
+            yield return new WaitForSeconds(1.2f);
+            yield return Capture("01b-idol-geyser-mark.png");
+            Assert.That(controller.AreaEffects.PendingStrikes.Count, Is.EqualTo(1));
+
             yield return PassTurnsUntil(controller, "blightgullet");
             CombatUnit toad = controller.ActiveUnit;
             int poisonIndex = AbilityIndex(controller, toad, "PoisonCloud");

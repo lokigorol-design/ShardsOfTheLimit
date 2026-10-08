@@ -35,7 +35,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RepulseStrike"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RaiseGround"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/LowerGround"), Is.Not.Null);
-            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(18));
+            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(22));
             Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(2));
             Assert.That(blazeDefinition.Abilities.All(ability => ability.Icon != null), Is.True);
             BattlePrototypeController controller = Object.FindAnyObjectByType<BattlePrototypeController>();
@@ -43,9 +43,11 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller, Is.Not.Null);
             Assert.That(feedback, Is.Not.Null);
             Assert.That(controller.CurrentTimelineTick, Is.GreaterThan(0));
+            // Two Speed 11 raiders (AI) act at tick 91 before the Speed 10 Primal Idol at 100.
+            float startTimeout = Time.time + 15f;
+            while (Time.time < startTimeout && controller.ActiveUnit.ControlType != ControlType.Player) yield return null;
             Assert.That(controller.ActiveUnit.ControlType, Is.EqualTo(ControlType.Player));
-            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Teal Skirmisher"),
-                "Speed 12 acts first (83 ticks); the Speed 8 worm acts at 125.");
+            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Primal Idol"));
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             Assert.That(Object.FindObjectsByType<CellView>().Length, Is.EqualTo(100));
             Assert.That(Object.FindObjectsByType<CombatUnitView>().Length, Is.EqualTo(6));
@@ -73,7 +75,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blazeRenderer.material.GetTexture("_BumpMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_MetallicGlossMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_EmissionMap"), Is.Not.Null);
-            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm" && view.Unit.DefinitionId != "blightgullet")
+            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm" && view.Unit.DefinitionId != "blightgullet" && view.Unit.DefinitionId != "primal-idol")
                 .All(view => view.GetComponentsInChildren<Renderer>().Length >= 5), Is.True,
                 "Remaining temporary models must keep readable composite silhouettes.");
             ObstacleView[] obstacles = Object.FindObjectsByType<ObstacleView>();
@@ -82,6 +84,7 @@ namespace ShardsOfTheLimit.Tests
                 obstacle.GetComponent<MeshFilter>().sharedMesh.vertexCount > 20), Is.True, "Obstacles are rock formations.");
             Assert.That(controller.Units.Count(unit => unit.Team == Team.Player), Is.EqualTo(3));
             Assert.That(controller.Units.Any(unit => unit.DefinitionId == "blightgullet"), Is.True, "The toad fights in the main battle.");
+            Assert.That(controller.Units.Any(unit => unit.DefinitionId == "primal-idol"), Is.True, "Primal Idol fights in the main battle.");
             Assert.That(controller.Units.Count(unit => unit.Team == Team.Opponent), Is.EqualTo(3));
             Assert.That(controller.Units.Count(unit => unit.DefinitionId == "amber-raider"), Is.EqualTo(2));
             Assert.That(controller.NextIntentUnit, Is.Not.Null);
@@ -130,7 +133,7 @@ namespace ShardsOfTheLimit.Tests
             // The log keeps only recent lines, so remember everything shown while turns pass.
             var seenLog = new System.Collections.Generic.HashSet<string>();
 
-            // Skirmisher → two AI raiders → Blight Gullet → Blaze Worm (Speed 12, 11, 11, 9, 8).
+            // Primal Idol → Blight Gullet → Blaze Worm (Speed 10, 9, 8).
             float timeout = Time.time + 20f;
             while (Time.time < timeout && controller.ActiveUnit.DisplayName != "Blaze Worm")
             {
@@ -158,7 +161,14 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller.ActiveUnit.Cell, Is.EqualTo(new GridCoordinate(2, 2)));
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.Zero, "Deep Burrow spends both AP.");
 
-            controller.RequestEndTurn();
+            // Deep Burrow spent both AP: the turn ends by itself; nudge it if the player turn is still open.
+            timeout = Time.time + 5f;
+            while (Time.time < timeout && controller.ActiveUnit.DisplayName == "Blaze Worm")
+            {
+                controller.RequestEndTurn();
+                yield return null;
+            }
+
             timeout = Time.time + 12f;
             while (Time.time < timeout && controller.ActiveUnit != null &&
                    controller.ActiveUnit.ControlType != ControlType.Player)
@@ -169,7 +179,7 @@ namespace ShardsOfTheLimit.Tests
             seenLog.UnionWith(feedback.RecentEntries);
 
             Assert.That(controller.ActiveUnit.ControlType, Is.EqualTo(ControlType.Player));
-            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Teal Skirmisher"));
+            Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Primal Idol"), "Brute and raiders act, then the idol at tick 200.");
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             int playerDurabilityAfter = controller.Units
                 .Where(unit => unit.Team == Team.Player)
@@ -189,6 +199,8 @@ namespace ShardsOfTheLimit.Tests
             BattlePrototypeController controller = Object.FindAnyObjectByType<BattlePrototypeController>();
             BattleFeedbackView feedback = Object.FindAnyObjectByType<BattleFeedbackView>();
             Assert.That(controller, Is.Not.Null);
+            float playerTimeout = Time.time + 15f;
+            while (Time.time < playerTimeout && controller.ActiveUnit.ControlType != ControlType.Player) yield return null;
             CombatUnit[] opponents = controller.Units
                 .Where(unit => unit.Team == Team.Opponent)
                 .ToArray();

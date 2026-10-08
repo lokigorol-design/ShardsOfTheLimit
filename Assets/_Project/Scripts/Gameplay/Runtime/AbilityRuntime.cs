@@ -22,6 +22,8 @@ namespace ShardsOfTheLimit.Runtime
         public IReadOnlyList<ICombatEffectResult> Results { get; }
         public IReadOnlyList<TerrainChangeResult> TerrainResults { get; }
         public IReadOnlyList<CloudAreaEffect> Clouds { get; internal set; } = Array.Empty<CloudAreaEffect>();
+        public IReadOnlyList<DelayedStrike> Strikes { get; internal set; } = Array.Empty<DelayedStrike>();
+        public IReadOnlyList<TrapObject> Traps { get; internal set; } = Array.Empty<TrapObject>();
     }
 
     /// <summary>Single source of targeting, preview and execution math for prototype abilities.</summary>
@@ -80,8 +82,12 @@ namespace ShardsOfTheLimit.Runtime
                     .Where(coordinate => IsValidTerrainTarget(coordinate, grid, source, battleUnits, terrainEffects))
                     .ToArray();
             }
-            if (ability.Effects.OfType<CreateCloudEffectDefinition>().Any())
+            if (ability.Effects.Any(effect => effect is CreateCloudEffectDefinition || effect is DelayedStrikeEffectDefinition ||
+                                              effect is PullToPointEffectDefinition))
                 geometricTargets = geometricTargets.Where(c => grid.GetCell(c).IsWalkable).ToArray();
+            if (ability.Effects.OfType<CreateTrapEffectDefinition>().Any())
+                geometricTargets = geometricTargets.Where(c => grid.GetCell(c).IsWalkable &&
+                    !battleUnits.Any(unit => !unit.IsDefeated && unit.Cell == c)).ToArray();
 
             if (ability.TargetType != AbilityTargetType.Unit)
             {
@@ -181,6 +187,16 @@ namespace ShardsOfTheLimit.Runtime
             CombatUnit[] affectedTargets = battleUnits
                 .Where(unit => !unit.IsDefeated && affectedSet.Contains(unit.Cell))
                 .ToArray();
+            PullToPointEffectDefinition magnet = ability.Effects.OfType<PullToPointEffectDefinition>().FirstOrDefault();
+            if (magnet != null)
+            {
+                // Storm Magnet acts on one resonant: the first on a line from the point within reach.
+                CombatUnit pulled = ForcedMovementCalculator.FindFirstOnLines(grid, selectedTarget, magnet.reach, battleUnits);
+                affectedTargets = pulled != null ? new[] { pulled } : Array.Empty<CombatUnit>();
+            }
+
+            var strikes = new List<DelayedStrike>();
+            var traps = new List<TrapObject>();
             var forecast = battleUnits
                 .Where(unit => !unit.IsDefeated)
                 .ToDictionary(unit => unit, unit => unit.ResourceState);
@@ -204,11 +220,25 @@ namespace ShardsOfTheLimit.Runtime
                     clouds.Add(PreviewCloud(createCloud.cloud, areas, grid, source, ability, selectedTarget, timelineTick));
                     continue;
                 }
+                if (effect is DelayedStrikeEffectDefinition delayed)
+                {
+                    strikes.Add(new DelayedStrike(source, ability.StableId, affected.Where(c => grid.GetCell(c).IsWalkable),
+                        timelineTick + delayed.delayTicks, delayed.attackMultiplier * (double)source.Attack,
+                        BurningCalculator.PowerFromAttack(source.Attack, delayed.burnAttackMultiplier), delayed.burnDurationPulses));
+                    continue;
+                }
+                if (effect is CreateTrapEffectDefinition trapEffect)
+                {
+                    traps.Add(new TrapObject(source, ability.StableId, selectedTarget, timelineTick + trapEffect.lifetimeTicks,
+                        trapEffect.fallHealthPercent));
+                    continue;
+                }
                 if (effect is ModifyTerrainEffectDefinition terrainEffect)
                 {
                     foreach (GridCoordinate coordinate in affected)
                     {
                         if (!forecastTerrain.TryGetValue(coordinate, out GridCell cell) ||
+                            !terrainEffect.LiftsOccupant &&
                             forecastPositions.Any(entry => entry.Key != source && entry.Value == coordinate))
                         {
                             continue;
@@ -257,7 +287,8 @@ namespace ShardsOfTheLimit.Runtime
                         forecastPositions[source],
                         forecastPositions[target],
                         coordinate => forecastPositions.Any(entry =>
-                            entry.Key != target && entry.Value == coordinate));
+                            entry.Key != target && entry.Value == coordinate),
+                        selectedTarget);
                     results.Add(result);
                     if (result is PushResult push)
                     {
@@ -288,13 +319,17 @@ namespace ShardsOfTheLimit.Runtime
                 if (clouds.Count > 0 && areas == null) throw new InvalidOperationException("Cloud execution requires battle AreaEffectWorld.");
                 CombatEffectResolver.Apply(results);
                 foreach (var cloud in clouds) areas.Add(cloud);
+                if ((strikes.Count > 0 || traps.Count > 0) && areas == null)
+                    throw new InvalidOperationException("Delayed strikes and traps require battle AreaEffectWorld.");
+                foreach (DelayedStrike strike in strikes) areas.AddStrike(strike);
+                foreach (TrapObject trap in traps) areas.AddTrap(trap);
                 foreach (TerrainChangeResult terrainResult in terrainResults)
                 {
                     grid.ApplyTerrainChange(terrainResult);
                 }
             }
 
-            return new AbilityResolution(affected, results, terrainResults) { Clouds = clouds };
+            return new AbilityResolution(affected, results, terrainResults) { Clouds = clouds, Strikes = strikes, Traps = traps };
         }
 
         private static CloudAreaEffect PreviewCloud(CloudDefinition definition, AreaEffectWorld areas, TacticalGrid grid,
@@ -354,10 +389,13 @@ namespace ShardsOfTheLimit.Runtime
             TacticalGrid grid,
             GridCoordinate sourcePosition,
             GridCoordinate targetPosition,
-            Func<GridCoordinate, bool> isOccupied)
+            Func<GridCoordinate, bool> isOccupied,
+            GridCoordinate point)
         {
             switch (effect)
             {
+                case PullToPointEffectDefinition _:
+                    return ForcedMovementCalculator.PullToPoint(grid, target, point, targetPosition, isOccupied);
                 case DamageEffectDefinition damage:
                     return CombatEffectCalculator.Damage(target, state, damage.RawDamage(source.Attack));
                 case HealEffectDefinition heal:
@@ -397,7 +435,8 @@ namespace ShardsOfTheLimit.Runtime
         {
             if (!grid.Contains(coordinate)) return false;
             GridCell cell = grid.GetCell(coordinate);
-            if (!cell.IsWalkable || units.Any(unit =>
+            bool liftsOccupants = effects.All(effect => effect.LiftsOccupant);
+            if (!cell.IsWalkable || !liftsOccupants && units.Any(unit =>
                     unit != source && !unit.IsDefeated && unit.Cell == coordinate))
             {
                 return false;

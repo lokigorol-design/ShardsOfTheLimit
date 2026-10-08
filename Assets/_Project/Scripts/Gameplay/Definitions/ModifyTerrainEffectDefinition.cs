@@ -8,9 +8,12 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField] private int heightDelta = 1;
         [SerializeField, Min(0)] private int minimumHeight = 0;
         [SerializeField, Min(0)] private int maximumHeight = 3;
+        [SerializeField, Tooltip("Earth Pillar: the cell rises together with whoever stands on it.")]
+        private bool liftsOccupant;
 
         public int HeightDelta => heightDelta;
         public int MinimumHeight => minimumHeight;
         public int MaximumHeight => maximumHeight;
+        public bool LiftsOccupant => liftsOccupant;
     }
 }

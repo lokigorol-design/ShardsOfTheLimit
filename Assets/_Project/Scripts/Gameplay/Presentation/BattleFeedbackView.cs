@@ -38,6 +38,16 @@ namespace ShardsOfTheLimit.Presentation
 
         public IReadOnlyList<string> RecentEntries => logEntries;
 
+        /// <summary>Screen rectangle of the action log (GUI coordinates), so clicks over it do not reach the field.</summary>
+        public Rect LogRect
+        {
+            get
+            {
+                float width = Mathf.Min(360f, Screen.width * 0.3f);
+                return new Rect(Screen.width - width - 12f, 12f, width, 170f);
+            }
+        }
+
         public void AddLog(string message)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
@@ -299,7 +309,7 @@ namespace ShardsOfTheLimit.Presentation
             if (logStyle != null) return;
             logStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 13,
+                fontSize = 12,
                 wordWrap = true,
                 alignment = TextAnchor.UpperLeft
             };
@@ -320,9 +330,14 @@ namespace ShardsOfTheLimit.Presentation
 
         private void DrawLog()
         {
-            float width = Mathf.Min(390f, Screen.width * 0.38f);
-            var box = new Rect(Screen.width - width - 12f, 12f, width, 184f);
-            GUI.Box(box, "ACTION LOG");
+            Rect box = LogRect;
+            Color previous = GUI.color;
+            GUI.color = new Color(0.05f, 0.06f, 0.08f, 0.82f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = new Color(0.85f, 0.72f, 0.45f, 0.55f);
+            GUI.DrawTexture(new Rect(box.x, box.y, box.width, 1f), Texture2D.whiteTexture);
+            GUI.color = previous;
+            GUI.Label(new Rect(box.x + 10f, box.y + 3f, box.width - 20f, 20f), "Журнал боя", logStyle);
             string text = string.Join("\n", logEntries.Select(entry => $"› {entry}"));
             GUI.Label(new Rect(box.x + 12f, box.y + 25f, box.width - 24f, box.height - 32f), text, logStyle);
         }

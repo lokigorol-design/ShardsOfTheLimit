@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Oil
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: OIL
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: b2ccf9390aabaea49b4a8a676388b4ab, type: 3}
   mechanic: 3
   maximumStacks: 999
   durationTicks: 300

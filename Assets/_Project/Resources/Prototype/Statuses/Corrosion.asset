@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Corrosion
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: CORROSION
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 84612f29ef6869447bd787ecdb9f1a6f, type: 3}
   mechanic: 2
   maximumStacks: 999
   durationTicks: 300

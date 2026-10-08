@@ -219,6 +219,8 @@ namespace ShardsOfTheLimit.Presentation
             BuildGrid();
             ConfigureCameraAndLight();
             feedback = gameObject.AddComponent<BattleFeedbackView>();
+            LoadStatusIcons();
+
             SpawnUnits();
             InitializeAreaEffects();
             turns = new TimelineCoordinator(units, ActionsPerTurn) { AreaEffects = areaEffects };
@@ -260,7 +262,9 @@ namespace ShardsOfTheLimit.Presentation
             {
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + index)))
                 {
-                    BeginAbilityTargeting(index);
+                    // Pressing the selected ability's key again returns to movement.
+                    if (mode == InteractionMode.AbilityTargeting && selectedAbilityIndex == index) CancelAbility();
+                    else BeginAbilityTargeting(index);
                 }
             }
 
@@ -279,11 +283,7 @@ namespace ShardsOfTheLimit.Presentation
                 EndPlayerTurn();
             }
 
-            bool pointerOutsideHud = Input.mousePosition.y > 205f && Input.mousePosition.y < Screen.height - 270f;
-            if (Input.GetMouseButtonDown(0) && pointerOutsideHud)
-            {
-                HandlePointer(Input.mousePosition);
-            }
+            UpdatePointer();
         }
 
         private void LoadDefinitions()
@@ -291,7 +291,8 @@ namespace ShardsOfTheLimit.Presentation
             playerDefinitions = new[]
             {
                 Resources.Load<UnitDefinition>(blightgulletShowcase ? "Prototype/Units/Blightgullet" : "Prototype/Units/BlazeWorm"),
-                Resources.Load<UnitDefinition>("Prototype/Units/RangerEcho"),
+                // The main battle fields both authored resonants: the worm and the toad.
+                Resources.Load<UnitDefinition>(blightgulletShowcase ? "Prototype/Units/RangerEcho" : "Prototype/Units/Blightgullet"),
                 Resources.Load<UnitDefinition>("Prototype/Units/SkirmisherEcho")
             };
             opponentDefinitions = new[]
@@ -324,11 +325,6 @@ namespace ShardsOfTheLimit.Presentation
                 throw new InvalidOperationException("Prototype content must expose seven to sixteen distinct abilities.");
             }
 
-            AbilityDefinition sharedFireBurst = Resources.Load<AbilityDefinition>("Prototype/Abilities/FireBurst");
-            if (sharedFireBurst == null || playerDefinitions.Count(definition => definition.Abilities.Contains(sharedFireBurst)) < 2)
-            {
-                throw new InvalidOperationException("At least two allied Echoes must reuse the shared Fire Burst definition.");
-            }
 
             ApplyBurnEffectDefinition burn =
                 Resources.Load<ApplyBurnEffectDefinition>("Prototype/Effects/ApplyBurnTenPercent");
@@ -370,61 +366,58 @@ namespace ShardsOfTheLimit.Presentation
                     columnCenterY,
                     WorldZ(cell.Coordinate.Y));
                 block.transform.localScale = new Vector3(0.98f, columnHeight, 0.98f);
+                Material stone = BattleEnvironment.CreateCellMaterial(cell.IsWalkable);
+                // Offset each column's stone so neighbouring tiles do not repeat the same pattern.
+                stone.mainTextureOffset = new Vector2((cell.Coordinate.X * 0.37f) % 1f, (cell.Coordinate.Y * 0.61f) % 1f);
+                block.GetComponent<Renderer>().material = stone;
                 Color baseColor = GetCellBaseColor(cell);
                 CellView view = block.AddComponent<CellView>();
                 view.Initialize(cell.Coordinate, baseColor);
                 cellViews.Add(cell.Coordinate, view);
-                if (!cell.IsWalkable) CreateObstacleCone(cell);
+                if (!cell.IsWalkable) CreateObstacleRocks(cell);
             }
+
+            BattleEnvironment.CreateGround(transform, -0.62f);
+            CreateBorderBoulders();
         }
 
-        private void CreateObstacleCone(GridCell cell)
+        /// <summary>Obstacles read as rock formations: one large rock with a couple of smaller ones around it.</summary>
+        private void CreateObstacleRocks(GridCell cell)
         {
-            var obstacle = new GameObject($"Obstacle Cone {cell.Coordinate}");
+            int seed = cell.Coordinate.X * 73 + cell.Coordinate.Y * 131;
+            var obstacle = new GameObject($"Obstacle Rocks {cell.Coordinate}");
             obstacle.transform.SetParent(transform, false);
             obstacle.transform.position = new Vector3(
                 WorldX(cell.Coordinate.X),
                 cell.Height * HeightStep + 0.02f,
                 WorldZ(cell.Coordinate.Y));
+            obstacle.transform.rotation = Quaternion.Euler(0f, seed % 360, 0f);
+            obstacle.AddComponent<MeshFilter>().sharedMesh = BattleEnvironment.CreateRockMesh(seed, 0.4f, 0.75f);
+            obstacle.AddComponent<MeshRenderer>().sharedMaterial = BattleEnvironment.RockMaterial;
+            for (int index = 0; index < 2; index++)
+            {
+                float angle = (seed + index * 140) * Mathf.Deg2Rad;
+                Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.32f;
+                BattleEnvironment.CreateRock(obstacle.transform, obstacle.transform.position + offset,
+                    seed + index + 1, 0.16f, 0.2f);
+            }
 
-            MeshFilter filter = obstacle.AddComponent<MeshFilter>();
-            filter.sharedMesh = CreateConeMesh(18, 0.34f, 0.82f);
-            MeshRenderer renderer = obstacle.AddComponent<MeshRenderer>();
-            renderer.material.color = new Color(1f, 0.34f, 0.06f);
             obstacle.AddComponent<ObstacleView>().Initialize(cell.Coordinate);
         }
 
-        private static Mesh CreateConeMesh(int segments, float radius, float height)
+        /// <summary>Boulders on the ground around the plateau so the field does not float in a void.</summary>
+        private void CreateBorderBoulders()
         {
-            var vertices = new Vector3[segments + 2];
-            vertices[0] = new Vector3(0f, height, 0f);
-            vertices[1] = Vector3.zero;
-            for (int index = 0; index < segments; index++)
+            var random = new System.Random(7);
+            float half = GridWidth * CellSpacing * 0.5f;
+            for (int index = 0; index < 26; index++)
             {
-                float angle = index * Mathf.PI * 2f / segments;
-                vertices[index + 2] = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+                float angle = (float)(random.NextDouble() * Math.PI * 2);
+                float distance = half + 0.9f + (float)random.NextDouble() * 5f;
+                var position = new Vector3(Mathf.Cos(angle) * distance, -0.64f, Mathf.Sin(angle) * distance);
+                float size = 0.25f + (float)random.NextDouble() * 0.6f;
+                BattleEnvironment.CreateRock(transform, position, 500 + index, size, size * 0.7f).name = "Border Boulder";
             }
-
-            var triangles = new int[segments * 6];
-            for (int index = 0; index < segments; index++)
-            {
-                int current = index + 2;
-                int next = (index + 1) % segments + 2;
-                int triangle = index * 6;
-                triangles[triangle] = 0;
-                triangles[triangle + 1] = next;
-                triangles[triangle + 2] = current;
-                triangles[triangle + 3] = 1;
-                triangles[triangle + 4] = current;
-                triangles[triangle + 5] = next;
-            }
-
-            var mesh = new Mesh { name = "Prototype Obstacle Cone" };
-            mesh.vertices = vertices;
-            mesh.triangles = triangles;
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return mesh;
         }
 
         private void ConfigureCameraAndLight()
@@ -455,9 +448,7 @@ namespace ShardsOfTheLimit.Presentation
                 light = lightObject.AddComponent<Light>();
             }
 
-            light.type = LightType.Directional;
-            light.intensity = 1.25f;
-            light.transform.rotation = Quaternion.Euler(52f, -34f, 0f);
+            BattleEnvironment.ConfigureLighting(light, battleCamera);
         }
 
         private void UpdateCameraControls()
@@ -606,6 +597,7 @@ namespace ShardsOfTheLimit.Presentation
             body.transform.localScale = Vector3.one;
             CombatUnitView view = body.AddComponent<CombatUnitView>();
             view.Initialize(unit, fallbackColor);
+            body.AddComponent<StatusAuraView>().Initialize(unit);
             unitViews.Add(unit, view);
         }
 
@@ -653,36 +645,6 @@ namespace ShardsOfTheLimit.Presentation
             return root;
         }
 
-        private void HandlePointer(Vector3 screenPosition)
-        {
-            Camera camera = Camera.main;
-            if (camera == null || !Physics.Raycast(camera.ScreenPointToRay(screenPosition), out RaycastHit hit, 100f))
-            {
-                return;
-            }
-
-            CombatUnitView unitView = hit.collider.GetComponentInParent<CombatUnitView>();
-            if (unitView != null)
-            {
-                if (mode == InteractionMode.Movement && unitView.Unit.ControlType == ControlType.Player)
-                {
-                    SelectUnit(unitView.Unit);
-                }
-                else
-                {
-                    HandleCellChoice(unitView.Unit.Cell);
-                }
-
-                return;
-            }
-
-            CellView cellView = hit.collider.GetComponent<CellView>();
-            if (cellView != null)
-            {
-                HandleCellChoice(cellView.Coordinate);
-            }
-        }
-
         private void HandleCellChoice(GridCoordinate coordinate)
         {
             if (selectedUnit == null || turns.CurrentUnit != selectedUnit || selectedUnit.CurrentActionPoints <= 0)
@@ -712,8 +674,7 @@ namespace ShardsOfTheLimit.Presentation
                 previewImpact = abilityPreview.ImpactCells;
                 selectedUnit.CurrentAction = $"Previewing {ability.DisplayName} at {coordinate}";
                 status = $"Orange cells show impact. {BuildAbilitySummary(abilityPreview, true)} Confirm with Enter.";
-                feedback.AddLog(
-                    $"Preview: {ability.DisplayName} at {coordinate} — {BuildAbilitySummary(abilityPreview, true)}");
+
                 RefreshHighlights();
                 return;
             }
@@ -889,19 +850,36 @@ namespace ShardsOfTheLimit.Presentation
             const float depth = 1.4f;
             const float speed = 4.5f;
             Transform body = unitViews[unit].transform;
+            Vector3 startGround = EffectWorldPosition(unit.Cell);
+            AbilityVfx.BurrowDig(startGround);
             Vector3 sunk = body.position + Vector3.down * depth;
             while ((body.position - sunk).sqrMagnitude > 0.0004f)
             {
                 body.position = Vector3.MoveTowards(body.position, sunk, Time.deltaTime * speed);
+                if (UnityEngine.Random.value < 0.5f) AbilityVfx.BurrowTrail(startGround);
                 yield return null;
             }
 
+            // A line of dust and rumbling ground runs from the entry hole to the exit.
             Vector3 surface = UnitWorldPosition(destinationCell);
+            Vector3 endGround = EffectWorldPosition(destinationCell);
             body.position = surface + Vector3.down * depth;
-            yield return new WaitForSeconds(0.15f);
+            float travel = 0f;
+            float travelDuration = Mathf.Clamp(Vector3.Distance(startGround, endGround) * 0.08f, 0.2f, 0.55f);
+            while (travel < travelDuration)
+            {
+                travel += Time.deltaTime;
+                Vector3 underground = Vector3.Lerp(startGround, endGround, travel / travelDuration);
+                AbilityVfx.BurrowTrail(underground);
+                AbilityVfx.BurrowTrail(underground);
+                VfxSystem.Instance.Shake(0.02f, 0.05f);
+                yield return null;
+            }
+
+            AbilityVfx.BurrowEmerge(endGround);
             while ((body.position - surface).sqrMagnitude > 0.0004f)
             {
-                body.position = Vector3.MoveTowards(body.position, surface, Time.deltaTime * speed);
+                body.position = Vector3.MoveTowards(body.position, surface, Time.deltaTime * speed * 1.6f);
                 yield return null;
             }
 
@@ -951,12 +929,8 @@ namespace ShardsOfTheLimit.Presentation
             selectedUnit.CurrentAction = $"Casting {ability.DisplayName}";
             status = $"{selectedUnit.DisplayName} launches {ability.DisplayName}...";
             feedback.AddLog($"{selectedUnit.DisplayName} casts {ability.DisplayName} at {target} (-{ability.ActionCost} AP)");
-            yield return feedback.PlayAbility(
-                unitViews[selectedUnit].transform.position + Vector3.up * 0.4f,
-                EffectWorldPosition(target) + Vector3.up * 0.45f,
-                actualImpact.Select(EffectWorldPosition).ToArray(),
-                GetAbilityColor(ability),
-                GetAbilityVisualKind(ability));
+            yield return PlayAbilityVisual(selectedUnit, ability, target, actualImpact);
+
 
             AbilityResolution resolution = ResolveAbility(selectedUnit, ability, target);
             EnsurePreviewMatchesExecution(abilityPreview, resolution);
@@ -1003,6 +977,8 @@ namespace ShardsOfTheLimit.Presentation
                 if (result.Kind == CombatEffectKind.Damage)
                 {
                     if (!hitViews.Contains(view)) hitViews.Add(view);
+                    if (result.HealthDelta < 0 || result.ShieldDelta < 0)
+                        AbilityVfx.Hit(view.transform.position, result.HealthDelta == 0);
                     if (result.ShieldDelta < 0)
                     {
                         feedback.AddFloatingText(labelPosition, $"{result.ShieldDelta} SHIELD", new Color(0.2f, 0.75f, 1f));
@@ -1056,6 +1032,7 @@ namespace ShardsOfTheLimit.Presentation
                 if (unitViews.TryGetValue(result.Target, out CombatUnitView defeatedView))
                 {
                     feedback.AddLog($"{result.Target.DisplayName} is defeated");
+                    AbilityVfx.Defeat(defeatedView.transform.position);
                     defeatedView.gameObject.SetActive(false);
                 }
             }
@@ -1216,6 +1193,43 @@ namespace ShardsOfTheLimit.Presentation
             }
         }
 
+        /// <summary>Signature effect for worm and toad abilities; generic animation for the rest.</summary>
+        private IEnumerator PlayAbilityVisual(
+            CombatUnit source,
+            AbilityDefinition ability,
+            GridCoordinate target,
+            IReadOnlyCollection<GridCoordinate> impact)
+        {
+            Transform sourceView = unitViews.TryGetValue(source, out CombatUnitView view) ? view.transform : null;
+            CombatUnit targetUnit = units.FirstOrDefault(unit => !unit.IsDefeated && unit.Cell == target);
+            var cloudEffect = ability.Effects.OfType<CreateCloudEffectDefinition>().FirstOrDefault();
+            var context = new AbilityVfxContext
+            {
+                SourceView = sourceView,
+                Source = sourceView != null ? sourceView.position : UnitWorldPosition(source.Cell),
+                Target = targetUnit != null && unitViews.TryGetValue(targetUnit, out CombatUnitView targetView)
+                    ? targetView.transform.position
+                    : EffectWorldPosition(target) + Vector3.up * 0.3f,
+                TargetView = targetUnit != null && unitViews.TryGetValue(targetUnit, out CombatUnitView targetBody)
+                    ? targetBody.transform
+                    : null,
+                ImpactCells = impact.Select(EffectWorldPosition).ToArray(),
+                CloudColor = cloudEffect?.cloud != null ? cloudEffect.cloud.color : Color.green
+            };
+            if (AbilityVfx.TryCreate(ability.StableId, context, out IEnumerator signature))
+            {
+                yield return signature;
+                yield break;
+            }
+
+            yield return feedback.PlayAbility(
+                context.Source + Vector3.up * 0.4f,
+                EffectWorldPosition(target) + Vector3.up * 0.45f,
+                context.ImpactCells,
+                GetAbilityColor(ability),
+                GetAbilityVisualKind(ability));
+        }
+
         private void PresentTimelineResults(IReadOnlyList<ICombatEffectResult> results)
         {
             foreach (ICombatEffectResult tick in results)
@@ -1225,7 +1239,12 @@ namespace ShardsOfTheLimit.Presentation
                     Vector3 position = view.transform.position + Vector3.up * 0.85f;
                     feedback.AddFloatingText(position, tick is StatusAppliedResult s ? $"{s.State.Rules.Id} ×{s.State.Stacks}" :
                         $"{tick.Kind} HP {tick.HealthDelta:+0;-0;0} SH {tick.ShieldDelta:+0;-0;0}", new Color(1f, 0.65f, 0.1f));
-                    if (tick.Target.IsDefeated) view.gameObject.SetActive(false);
+                    if (tick.HealthDelta < 0 || tick.ShieldDelta < 0) AbilityVfx.Hit(view.transform.position, tick.HealthDelta == 0);
+                    if (tick.Target.IsDefeated)
+                    {
+                        AbilityVfx.Defeat(view.transform.position);
+                        view.gameObject.SetActive(false);
+                    }
                 }
 
                 feedback.AddLog(DescribeResult(tick, false));
@@ -1307,12 +1326,8 @@ namespace ShardsOfTheLimit.Presentation
                 feedback.AddLog($"{unit.DisplayName} casts {ability.DisplayName} at {abilityTarget} (-{ability.ActionCost} AP)");
                 RefreshHighlights();
                 yield return new WaitForSeconds(0.35f);
-                yield return feedback.PlayAbility(
-                    unitViews[unit].transform.position + Vector3.up * 0.4f,
-                    EffectWorldPosition(abilityTarget) + Vector3.up * 0.45f,
-                    previewImpact.Select(EffectWorldPosition).ToArray(),
-                    GetAbilityColor(ability),
-                    GetAbilityVisualKind(ability));
+                yield return PlayAbilityVisual(unit, ability, abilityTarget, previewImpact);
+
 
                 AbilityResolution resolution = ResolveAbility(unit, ability, abilityTarget);
                 EnsurePreviewMatchesExecution(abilityPreview, resolution);
@@ -1724,7 +1739,8 @@ namespace ShardsOfTheLimit.Presentation
             {
                 if (cellViews.TryGetValue(coordinate, out CellView view))
                 {
-                    view.SetColor(color);
+                    // Tint the stone instead of painting over it, so the texture stays readable.
+                    view.SetColor(Color.Lerp(view.BaseColor, color, 0.72f) * 1.15f);
                 }
             }
         }
@@ -1787,12 +1803,10 @@ namespace ShardsOfTheLimit.Presentation
         {
             float normalizedHeight = (cell.Height - MinimumTerrainHeight) /
                                      (float)(MaximumTerrainHeight - MinimumTerrainHeight);
-            return cell.IsWalkable
-                ? Color.Lerp(
-                    new Color(0.12f, 0.25f, 0.42f),
-                    new Color(0.58f, 0.42f, 0.25f),
-                    normalizedHeight)
-                : new Color(0.12f, 0.12f, 0.13f);
+            // Natural palette: mossy low ground, warm sandstone on the heights, dark basalt under obstacles.
+            Color tint = Color.Lerp(new Color(0.5f, 0.56f, 0.44f), new Color(0.78f, 0.68f, 0.52f), normalizedHeight);
+            float checker = (cell.Coordinate.X + cell.Coordinate.Y) % 2 == 0 ? 1f : 0.93f;
+            return cell.IsWalkable ? tint * checker : new Color(0.3f, 0.29f, 0.3f);
         }
 
         private static void GetCellColumnGeometry(int height, out float centerY, out float columnHeight)
@@ -1818,82 +1832,6 @@ namespace ShardsOfTheLimit.Presentation
         {
             Scene activeScene = SceneManager.GetActiveScene();
             SceneManager.LoadScene(string.IsNullOrEmpty(activeScene.path) ? activeScene.name : activeScene.path);
-        }
-
-        private void OnGUI()
-        {
-            EnsureInterfaceStyles();
-            DrawMovementCostLabels();
-            DrawAbilityPreviewLabels();
-            DrawStatusEffectLabels();
-            DrawCloudInformation();
-            float hudWidth = Mathf.Min(760f, Screen.width * 0.6f);
-            GUI.Box(new Rect(12f, 12f, hudWidth, 250f), "");
-            GUI.Label(new Rect(24f, 18f, hudWidth - 180f, 24f), "SHARDS OF THE LIMIT — BLAZE WORM CONTENT SLICE");
-            float cameraButtonX = hudWidth - 130f;
-            if (GUI.Button(new Rect(cameraButtonX, 16f, 62f, 24f), "Cam [Q]")) RequestCameraRotation(-90f);
-            if (GUI.Button(new Rect(cameraButtonX + 66f, 16f, 62f, 24f), "Cam [E]")) RequestCameraRotation(90f);
-
-            CombatUnit active = turns?.CurrentUnit;
-            if (active != null)
-            {
-                GUI.Label(new Rect(24f, 40f, hudWidth - 24f, 22f),
-                    $"Tick {turns.CurrentTick}  Active: {active.DisplayName}  Actions: {active.CurrentActionPoints}/{ActionsPerTurn}  State: {active.CurrentAction}");
-            }
-
-            float columnWidth = (hudWidth - 42f) * 0.5f;
-            DrawRoster(Team.Player, "ALLIED ECHOES", 24f, 66f, columnWidth, active);
-            DrawRoster(Team.Opponent, "OPPONENTS", 30f + columnWidth, 66f, columnWidth, active);
-
-            GUI.Label(new Rect(24f, 172f, hudWidth - 24f, 20f),
-                "OBJECTIVE: Defeat every opponent before all allied Echoes fall.");
-            DrawInitiativeTimeline(24f, 194f, hudWidth - 24f, active);
-
-            GUI.Box(new Rect(12f, Screen.height - 194f, Screen.width - 24f, 182f), "");
-            GUI.Label(new Rect(24f, Screen.height - 186f, Screen.width - 48f, 22f), status);
-            GUI.Label(new Rect(24f, Screen.height - 164f, Screen.width - 48f, 22f), GetContextHint());
-            GUI.Label(new Rect(24f, Screen.height - 142f, Screen.width - 48f, 20f),
-                "[M] melee: height difference reduces range · [R] ranged: high ground adds range · AOE damage/healing affects both teams");
-            bool canPlayerAct = !showOnboarding && !battleEnded && !isBusy && active?.ControlType == ControlType.Player;
-            IReadOnlyList<AbilityDefinition> abilities = active != null && definitionsByUnit.TryGetValue(active, out UnitDefinition definition)
-                ? definition.Abilities
-                : Array.Empty<AbilityDefinition>();
-            float buttonX = 24f;
-            float abilityButtonWidth = Mathf.Min(190f, (Screen.width - 48f - 8f * Mathf.Max(0, abilities.Count - 1)) / Mathf.Max(1, abilities.Count));
-            for (int index = 0; index < abilities.Count; index++)
-            {
-                AbilityDefinition ability = abilities[index];
-                int remainingCooldown = active.GetCooldown(ability.StableId);
-                string marker = mode == InteractionMode.AbilityTargeting && selectedAbilityIndex == index ? "▶ " : string.Empty;
-                string rangeMarker = ability.RangeType == AbilityRangeType.Melee ? "M" : "R";
-                string iconPadding = ability.Icon != null ? "      " : string.Empty;
-                string label = $"{iconPadding}{marker}[{index + 1}][{rangeMarker}] {ability.DisplayName}\n{iconPadding}AP {ability.ActionCost}  CD {remainingCooldown}";
-                GUI.enabled = canPlayerAct && active.CurrentActionPoints >= ability.ActionCost && remainingCooldown == 0;
-                var abilityButton = new Rect(buttonX, Screen.height - 116f, abilityButtonWidth, 34f);
-                if (GUI.Button(abilityButton, label)) BeginAbilityTargeting(index);
-                if (ability.Icon != null)
-                {
-                    GUI.DrawTexture(
-                        new Rect(abilityButton.x + 3f, abilityButton.y + 3f, 28f, 28f),
-                        ability.Icon.texture,
-                        ScaleMode.ScaleAndCrop,
-                        true);
-                }
-                buttonX += abilityButtonWidth + 8f;
-            }
-
-            GUI.enabled = canPlayerAct;
-            buttonX = 24f;
-            if (GUI.Button(new Rect(buttonX, Screen.height - 74f, 122f, 34f), "Confirm [Enter]")) ConfirmCurrentChoice();
-            buttonX += 130f;
-            if (GUI.Button(new Rect(buttonX, Screen.height - 74f, 104f, 34f), "Cancel [Esc]")) CancelAbility();
-            buttonX += 112f;
-            if (GUI.Button(new Rect(buttonX, Screen.height - 74f, 126f, 34f), "End Turn [Space]")) EndPlayerTurn();
-            GUI.enabled = true;
-            if (GUI.Button(new Rect(Screen.width - 142f, Screen.height - 38f, 116f, 24f), "Restart [R]")) Restart();
-
-            if (showOnboarding) DrawOnboarding();
-            if (battleEnded) DrawBattleResult();
         }
 
         private void EnsureInterfaceStyles()
@@ -1984,61 +1922,58 @@ namespace ShardsOfTheLimit.Presentation
 
         private string GetContextHint()
         {
-            if (battleEnded) return "Battle complete. Retry the same scenario or exit Play Mode.";
-            if (isBusy) return "Action is resolving. Watch the field markers, floating values and action log.";
-            if (turns?.CurrentUnit?.ControlType != ControlType.Player)
-                return "Enemy turn. Its resolved movement, ability and resource changes appear in the action log.";
+            if (battleEnded) return "Бой окончен. Можно начать заново.";
+            if (isBusy) return "Действие выполняется…";
+            if (turns?.CurrentUnit?.ControlType != ControlType.Player) return "Ход противника.";
             if (mode == InteractionMode.AbilityTargeting && selectedAbilityTarget.HasValue)
-                return "Orange is the exact impact area. Review HP/SH, push destination or height, then press Enter.";
+                return "Оранжевое — зона удара. Клик по цели применяет способность, правая кнопка — отмена.";
             if (mode == InteractionMode.AbilityTargeting)
-                return "Dark green is total range; bright green is a legal target. Click a bright cell.";
-            if (selectedDestination.HasValue)
-                return "Cyan is the validated path. Click the destination again or press Enter to move.";
-            return "Choose a blue reachable cell, or select a numbered ability. Space ends the active Echo's turn.";
+                return "Наведи на ярко-зелёную клетку, чтобы увидеть результат. Клик — применить, ПКМ — отмена.";
+            return "Наведи на синюю клетку — увидишь путь, клик — идти. 1–5 или иконка — способность. Space — конец хода.";
         }
 
         private void DrawOnboarding()
         {
-            float width = Mathf.Min(650f, Screen.width - 80f);
+            float width = Mathf.Min(660f, Screen.width - 80f);
             float height = 330f;
             var panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-            GUI.Box(panel, string.Empty);
+            GUI.color = new Color(0.05f, 0.06f, 0.08f, 0.94f);
+            GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            GUI.color = Color.white;
             string title;
             string body;
             switch (onboardingPage)
             {
                 case 0:
-                    title = "1/3 · MOVE AND HEIGHT";
-                    body = "Blue cells are truly reachable, not just geometrically close. Numbers are movement cost. " +
-                           "Climbing +1/+2 costs extra; a +3 step is blocked. Orange cones are obstacles.\n\n" +
-                           "Click a destination once to preview the cyan path, then click again or press Enter. " +
-                           "Right-drag rotates and tilts the camera; middle-drag or WASD/arrows moves it. " +
-                           "Q/E rotates by 90 degrees, the wheel zooms, and Home resets the view.";
+                    title = "1/3 · ПЕРЕМЕЩЕНИЕ";
+                    body = "Синие клетки — куда можно дойти, число — цена пути. Наведи курсор на клетку, " +
+                           "чтобы увидеть путь, и кликни, чтобы пойти. Подъём на 1–2 уровня стоит дороже, на 3 — нельзя.\n\n" +
+                           "Огненный червь ходит под землёй: за 2 ОД выныривает в любой свободной клетке в радиусе 6.\n\n" +
+                           "Камера: колесо — зум, правая кнопка с протяжкой — поворот, средняя или WASD — сдвиг, Q/E — поворот на 90°.";
                     break;
                 case 1:
-                    title = "2/3 · ABILITIES";
-                    body = "[M] is melee: every two height levels reduce range by one, rounded up. " +
-                           "[R] is ranged: high ground adds range and a higher target reduces it.\n\n" +
-                           "Dark green is total range, bright green is a legal target, orange is impact. " +
-                           "Area damage and area healing affect allies and enemies alike. Burn stacks its damage, " +
-                           "lasts three target turns and is shown above the affected unit.";
+                    title = "2/3 · СПОСОБНОСТИ";
+                    body = "Кликни по иконке внизу или нажми 1–5. Тёмно-зелёное — вся дальность, ярко-зелёное — " +
+                           "допустимые цели. Наведи на цель — увидишь зону удара и числа урона, кликни — способность сработает. " +
+                           "Правая кнопка мыши или Esc отменяют выбор.\n\n" +
+                           "Огонь по своим включён: области и удары по линии задевают союзников. Наведи на иконку, " +
+                           "чтобы прочитать описание.";
                     break;
                 default:
-                    title = "3/3 · TURNS AND INTENT";
-                    body = "Each unit receives 2 actions. The timeline starts with the active unit. " +
-                           "Only the next enemy reveals two intent slots: A attack, M movement, H help, S special.\n\n" +
-                           "Floating values and the action log show what actually happened. Defeat every opponent. " +
-                           "Press Space to end a turn and R to restart the scenario.";
+                    title = "3/3 · ХОДЫ";
+                    body = "Сверху — очередь ходов по Скорости. У следующего противника видно намерение: " +
+                           "A — атака, M — движение, H — помощь, S — особое.\n\n" +
+                           "У каждого 2 ОД за ход. Над юнитами — здоровье, щит и иконки статусов; наведи на юнита, " +
+                           "чтобы увидеть карточку. Space — конец хода, R — начать заново. Победи всех противников.";
                     break;
             }
 
             GUI.Label(new Rect(panel.x + 24f, panel.y + 20f, panel.width - 48f, 42f), title, onboardingTitleStyle);
-            GUI.Label(new Rect(panel.x + 34f, panel.y + 78f, panel.width - 68f, 176f), body, onboardingBodyStyle);
-            if (GUI.Button(new Rect(panel.x + 34f, panel.yMax - 58f, 126f, 34f), "Skip [Esc]")) CloseOnboarding();
-            string next = onboardingPage < 2 ? "Next [Enter]" : "Start Battle";
+            GUI.Label(new Rect(panel.x + 34f, panel.y + 74f, panel.width - 68f, 190f), body, onboardingBodyStyle);
+            if (GUI.Button(new Rect(panel.x + 34f, panel.yMax - 58f, 140f, 34f), "Пропустить (Esc)")) CloseOnboarding();
+            string next = onboardingPage < 2 ? "Далее (Enter)" : "В бой";
             if (GUI.Button(new Rect(panel.xMax - 174f, panel.yMax - 58f, 140f, 34f), next)) AdvanceOnboarding();
         }
-
         private void AdvanceOnboarding()
         {
             if (onboardingPage < 2)
@@ -2192,68 +2127,5 @@ namespace ShardsOfTheLimit.Presentation
                 : 0;
         }
 
-        private void DrawRoster(Team team, string heading, float x, float y, float width, CombatUnit active)
-        {
-            GUI.Label(new Rect(x, y, width, 20f), heading);
-            int row = 0;
-            foreach (CombatUnit unit in units.Where(candidate => candidate.Team == team))
-            {
-                string prefix = unit.IsDefeated ? "✕" : unit == active ? "▶" : "•";
-                string burning = unit.IsBurning
-                    ? $"  BURN {unit.BurningState.DamagePerPulse}/100t ({unit.BurningState.RemainingPulses()})"
-                    : string.Empty;
-                float rowY = y + 22f + row * 22f;
-                float textX = x;
-                if (definitionsByUnit.TryGetValue(unit, out UnitDefinition definition) && definition.Portrait != null)
-                {
-                    GUI.DrawTexture(
-                        new Rect(x, rowY + 1f, 20f, 20f),
-                        definition.Portrait.texture,
-                        ScaleMode.ScaleAndCrop,
-                        true);
-                    textX += 24f;
-                }
-
-                string text = $"{prefix} {unit.DisplayName}  HP {unit.CurrentHealth}/{unit.MaximumHealth}  SH {unit.CurrentShield}/{unit.MaximumShield}  ATK {unit.Attack} DEF {unit.EffectiveDefense:0.#} SPD {unit.Speed}{burning}";
-                GUI.Label(new Rect(textX, rowY, width - (textX - x), 22f), text);
-                row++;
-            }
-        }
-
-        private void DrawStatusEffectLabels()
-        {
-            if (battleCamera == null) return;
-            if (statusEffectStyle == null)
-            {
-                statusEffectStyle = new GUIStyle(GUI.skin.box)
-                {
-                    fontSize = 11,
-                    fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter
-                };
-                statusEffectStyle.normal.textColor = new Color(1f, 0.72f, 0.18f);
-            }
-
-            foreach (CombatUnit unit in units.Where(candidate => candidate.IsBurning && !candidate.IsDefeated))
-            {
-                if (!unitViews.TryGetValue(unit, out CombatUnitView view) || !view.gameObject.activeInHierarchy) continue;
-                Vector3 screen = battleCamera.WorldToScreenPoint(view.transform.position + Vector3.up * 1.38f);
-                if (screen.z <= 0f) continue;
-                var statusRect = new Rect(screen.x - 62f, Screen.height - screen.y - 13f, 124f, 26f);
-                string padding = burningIcon != null ? "     " : string.Empty;
-                GUI.Box(
-                    statusRect,
-                    $"{padding}BURN {unit.BurningState.DamagePerPulse}/100t · {unit.BurningState.RemainingPulses()}x",
-                    statusEffectStyle);
-                if (burningIcon != null)
-                {
-                    GUI.DrawTexture(
-                        new Rect(statusRect.x + 3f, statusRect.y + 3f, 20f, 20f),
-                        burningIcon.texture,
-                        ScaleMode.ScaleAndCrop,
-                        true);
-                }
-            }
-        }
     }
 }

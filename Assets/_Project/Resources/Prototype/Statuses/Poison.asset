@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Poison
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: POISON
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 2d4c8aa7036c0eb48a840135548a9e6a, type: 3}
   mechanic: 1
   maximumStacks: 999
   durationTicks: 300

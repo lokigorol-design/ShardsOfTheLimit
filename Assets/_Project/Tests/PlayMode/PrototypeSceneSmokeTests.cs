@@ -73,14 +73,15 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blazeRenderer.material.GetTexture("_BumpMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_MetallicGlossMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_EmissionMap"), Is.Not.Null);
-            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm")
+            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm" && view.Unit.DefinitionId != "blightgullet")
                 .All(view => view.GetComponentsInChildren<Renderer>().Length >= 5), Is.True,
                 "Remaining temporary models must keep readable composite silhouettes.");
             ObstacleView[] obstacles = Object.FindObjectsByType<ObstacleView>();
             Assert.That(obstacles.Length, Is.EqualTo(5));
             Assert.That(obstacles.All(obstacle =>
-                obstacle.GetComponent<MeshFilter>().sharedMesh.vertexCount == 20), Is.True);
+                obstacle.GetComponent<MeshFilter>().sharedMesh.vertexCount > 20), Is.True, "Obstacles are rock formations.");
             Assert.That(controller.Units.Count(unit => unit.Team == Team.Player), Is.EqualTo(3));
+            Assert.That(controller.Units.Any(unit => unit.DefinitionId == "blightgullet"), Is.True, "The toad fights in the main battle.");
             Assert.That(controller.Units.Count(unit => unit.Team == Team.Opponent), Is.EqualTo(3));
             Assert.That(controller.Units.Count(unit => unit.DefinitionId == "amber-raider"), Is.EqualTo(2));
             Assert.That(controller.NextIntentUnit, Is.Not.Null);
@@ -129,7 +130,7 @@ namespace ShardsOfTheLimit.Tests
             // The log keeps only recent lines, so remember everything shown while turns pass.
             var seenLog = new System.Collections.Generic.HashSet<string>();
 
-            // Skirmisher → two AI raiders → Ranger → Blaze Worm (Speed 12, 11, 11, 10, 8).
+            // Skirmisher → two AI raiders → Blight Gullet → Blaze Worm (Speed 12, 11, 11, 9, 8).
             float timeout = Time.time + 20f;
             while (Time.time < timeout && controller.ActiveUnit.DisplayName != "Blaze Worm")
             {
@@ -147,7 +148,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(7, 0)), Is.False, "7 cells is out of range.");
             Assert.That(controller.CurrentReachableCells.ContainsKey(new GridCoordinate(2, 4)), Is.False,
                 "Cannot emerge inside an obstacle.");
-            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False, "The Ranger occupies this cell.");
+            Assert.That(controller.RequestMove(new GridCoordinate(1, 4)), Is.False, "The toad occupies this cell.");
             Assert.That(controller.RequestMove(new GridCoordinate(2, 2)), Is.True, "Height 2 does not stop a burrow.");
             float movementTimeout = Time.time + 3f;
             while (Time.time < movementTimeout && controller.ActiveUnit.Cell != new GridCoordinate(2, 2))

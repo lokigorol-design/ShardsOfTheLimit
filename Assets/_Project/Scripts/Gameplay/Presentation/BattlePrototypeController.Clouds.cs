@@ -34,39 +34,58 @@ namespace ShardsOfTheLimit.Presentation
             cloudRoot.transform.SetParent(transform, false);
             foreach (var cloud in areaEffects.Clouds)
             {
+                Color color = cloudDefinitions.TryGetValue(cloud.Rules.Id, out var data) ? data.color : Color.green;
                 if (!cloudMaterials.TryGetValue(cloud.Rules.Id, out var material))
                 {
-                    material = new Material(Shader.Find("Shards/ComicCloud"));
-                    Color color = cloudDefinitions.TryGetValue(cloud.Rules.Id, out var data) ? data.color : Color.green;
-                    material.SetColor("_Color", color);
+                    // Soft ground stain under the drifting smoke; the smoke itself is particles (CloudPuffView).
+                    material = new Material(Shader.Find("Shards/VfxParticle") ?? Shader.Find("Sprites/Default"));
+                    material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    material.renderQueue = 2990;
                     cloudMaterials.Add(cloud.Rules.Id, material);
                 }
                 foreach (var cell in cloud.OccupiedCells)
                 {
-                    var volume = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    volume.name = $"{cloud.Rules.Id} {cell} owner:{cloud.OwnerId}";
-                    volume.transform.SetParent(cloudRoot.transform, false);
-                    Destroy(volume.GetComponent<Collider>());
-                    Vector3 position = EffectWorldPosition(cell);
-                    position.y = (cloud.LowerHeight + cloud.Rules.VerticalHeight / 2f) * HeightStep;
-                    volume.transform.position = position;
-                    volume.transform.localScale = new Vector3(0.95f, cloud.Rules.VerticalHeight * HeightStep, 0.95f);
-                    volume.GetComponent<Renderer>().sharedMaterial = material;
+                    var stain = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    stain.name = $"{cloud.Rules.Id} {cell} owner:{cloud.OwnerId}";
+                    stain.transform.SetParent(cloudRoot.transform, false);
+                    Destroy(stain.GetComponent<Collider>());
+                    Vector3 ground = EffectWorldPosition(cell);
+                    ground.y = Mathf.Max(ground.y - 0.1f, cloud.LowerHeight * HeightStep + 0.02f);
+                    stain.transform.position = ground;
+                    stain.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    stain.transform.localScale = new Vector3(1.15f, 1.15f, 1f);
+                    MeshFilter filter = stain.GetComponent<MeshFilter>();
+                    filter.mesh = CreateStainMesh(new Color(color.r, color.g, color.b, 0.45f));
+                    stain.GetComponent<Renderer>().sharedMaterial = material;
+                    stain.AddComponent<CloudPuffView>().Initialize(color, cloud.Rules.VerticalHeight * HeightStep * 1.6f);
                 }
             }
+        }
+
+        /// <summary>Unit quad with vertex colour and a soft-disc shape for the particle shader.</summary>
+        private static Mesh CreateStainMesh(Color color)
+        {
+            var mesh = new Mesh { name = "Cloud Stain" };
+            mesh.vertices = new[]
+            {
+                new Vector3(-0.5f, -0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f),
+                new Vector3(0.5f, 0.5f, 0f), new Vector3(0.5f, -0.5f, 0f)
+            };
+            mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
+            mesh.uv2 = new[] { new Vector2(0.2f, 0), new Vector2(0.2f, 0), new Vector2(0.2f, 0), new Vector2(0.2f, 0) };
+            mesh.colors = new[] { color, color, color, color };
+            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         private void DrawCloudInformation()
         {
             if (areaEffects == null || battleCamera == null) return;
             var labelStyle = new GUIStyle(GUI.skin.box) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
-            foreach (var unit in units.Where(u => !u.IsDefeated && (u.Statuses.Count > 0 || u.DefenseBonus > 0)))
-            {
-                Vector3 screen = battleCamera.WorldToScreenPoint(unitViews[unit].transform.position + Vector3.up * 1.7f);
-                string statuses = string.Join(" · ", unit.Statuses.Values.Select(s => $"{s.Rules.Id} {s.Stacks}"));
-                if (unit.DefenseBonus > 0) statuses += $" DEF +{unit.DefenseBonus}";
-                GUI.Box(new Rect(screen.x - 110, Screen.height - screen.y, 220, 24), statuses, labelStyle);
-            }
+            // Unit statuses are shown as icons on the unit plates (Hud partial).
+
             var displayedClouds = areaEffects.Clouds.Concat(abilityPreview?.Clouds ?? System.Array.Empty<CloudAreaEffect>());
             var labelRows = new Dictionary<GridCoordinate,int>();
             foreach (var cloud in displayedClouds)

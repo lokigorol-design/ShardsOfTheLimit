@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Immobilized
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: IMMOBILIZED
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f4fa2a340a331044da11b5798ce316b5, type: 3}
   mechanic: 0
   maximumStacks: 1
   durationTicks: 100

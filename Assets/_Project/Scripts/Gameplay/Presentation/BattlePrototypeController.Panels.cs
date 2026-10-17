@@ -186,7 +186,8 @@ namespace ShardsOfTheLimit.Presentation
             GUI.color = previous;
             GUI.Label(new Rect(panel.x + 36f, panel.y + 84f, panel.width - 72f, 66f),
                 $"Timeline tick {turns.CurrentTick} · Actions resolved: {resolvedActions}\n" +
-                $"Battle time: {Time.unscaledTime - battleStartedAt:0.0}s",
+                $"Battle time: {Time.unscaledTime - battleStartedAt:0.0}s · player turn avg {AveragePlayerTurnSeconds:0.0}s" +
+                (LastReportPath != null ? $"\nReport: Playtests/{System.IO.Path.GetFileName(LastReportPath)}" : string.Empty),
                 onboardingBodyStyle);
             if (GUI.Button(new Rect(panel.x + 52f, panel.yMax - 64f, 144f, 38f), "Retry")) Restart();
             if (GUI.Button(new Rect(panel.xMax - 196f, panel.yMax - 64f, 144f, 38f), "Exit")) ExitPrototype();

@@ -109,6 +109,7 @@ namespace ShardsOfTheLimit.Presentation
             RefreshCloudViews();
             if (EvaluateBattleEnd()) return;
             if (unit == null) return;
+            MeasureActivationStart(unit);
 
             Color teamColor = unit.Team == Team.Player
                 ? new Color(0.35f, 0.75f, 1f)

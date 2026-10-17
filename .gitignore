@@ -32,3 +32,6 @@ TestResults*.xml
 .codex_artifacts/
 outputs/
 tmp/
+
+# Playtest reports written by the game
+[Pp]laytests/

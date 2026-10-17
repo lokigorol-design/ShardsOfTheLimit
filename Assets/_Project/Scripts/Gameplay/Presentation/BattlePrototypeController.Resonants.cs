@@ -127,6 +127,7 @@ namespace ShardsOfTheLimit.Presentation
         /// <summary>Cooldown after a use: a channel starts its cooldown only when it ends.</summary>
         private void ApplyCooldown(CombatUnit source, AbilityDefinition ability, AbilityResolution resolution)
         {
+            MeasureAbility(ability);
             ChannelConeEffectDefinition channel = ChannelOf(ability);
             if (channel == null)
             {
@@ -151,6 +152,7 @@ namespace ShardsOfTheLimit.Presentation
         /// <summary>End of an activation: Banked Heat, and a channel that was not extended this turn goes out.</summary>
         private void FinishActivation(CombatUnit unit)
         {
+            MeasureActivationEnd(unit);
             if (unit == null || unit.IsDefeated) return;
             PassiveModifierDefinition modifiers = ModifiersOf(unit);
             if (modifiers != null && modifiers.bankedHeat && unit.CurrentActionPoints > 0)

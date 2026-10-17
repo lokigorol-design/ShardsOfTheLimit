@@ -140,6 +140,7 @@ namespace ShardsOfTheLimit.Presentation
         {
             if (!archon.SpendActionPoints(ArchonRules.ActionCost)) yield break;
             isBusy = true;
+            archonActions++;
             concentrationReadyTick = turns.CurrentTick + ArchonRules.ConcentrationTicks;
             FaceTowards(archon, archon.Cell, cell);
             if (unitViews.TryGetValue(archon, out CombatUnitView archonView))

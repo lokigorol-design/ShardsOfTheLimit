@@ -740,6 +740,7 @@ namespace ShardsOfTheLimit.Presentation
             if (outcome == BattleOutcome.Ongoing) return false;
 
             battleEnded = true;
+            WritePlaytestReport();
             isBusy = false;
             nextEnemyIntent = null;
             ClearInteractionState();

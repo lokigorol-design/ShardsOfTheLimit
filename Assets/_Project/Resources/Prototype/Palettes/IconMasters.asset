@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d13a2f5d12a2cc4cb178c83f2d07eb5, type: 3}
+  m_Name: IconMasters
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.IconMasterSet
+  masters:
+  - {fileID: 21300000, guid: ea883426c2f7c0b4b8745b59ea9fb7a6, type: 3}
+  - {fileID: 21300000, guid: d2dcb6ac82a185c46898bfcde16fc709, type: 3}
+  - {fileID: 21300000, guid: c7744884cba4872469a309e01aadeb0c, type: 3}
+  - {fileID: 21300000, guid: dee8029e887a38e499b27f341e28b070, type: 3}
+  - {fileID: 21300000, guid: bee675d0e606e7742afeb07b9b44eeb2, type: 3}
+  - {fileID: 21300000, guid: 660d632e22f071b4a8750b44ecc9eb69, type: 3}
+  - {fileID: 21300000, guid: d3f69d0d12cc0a540aadb245b9c04fbd, type: 3}
+  - {fileID: 21300000, guid: f3c357faf17e1a94b864ae6150926eb7, type: 3}
+  - {fileID: 21300000, guid: 2120646c66f497d4b97b829e5c91287b, type: 3}
+  - {fileID: 21300000, guid: 74fd1d157901a3944be577ce80d0c583, type: 3}
+  - {fileID: 21300000, guid: c19db9e7546bf0f4f910a239ba75f0f9, type: 3}
+  - {fileID: 21300000, guid: 97480efc2be12d84285c9bc38b54878b, type: 3}
+  - {fileID: 21300000, guid: d6f596b9f2824d641b0e6f7093a7aee8, type: 3}
+  - {fileID: 21300000, guid: 060b47ab68a368e43a93a2601e076d3f, type: 3}
+  - {fileID: 21300000, guid: a2d7923569a9a274fb6df88e8ea95ea3, type: 3}
+  - {fileID: 21300000, guid: 456f96acda89f8b478f75316c6aad66f, type: 3}
+  - {fileID: 21300000, guid: eafa7d4ab4bbf174ba24e8a32a48c767, type: 3}
+  - {fileID: 21300000, guid: 839c33a575f559141844cfcd0bcf8d35, type: 3}
+  - {fileID: 21300000, guid: b3e3d6b645aa19741963fe4d1f20a60a, type: 3}
+  - {fileID: 21300000, guid: 81f69f60b23142849b4406c0386afbb8, type: 3}
+  - {fileID: 21300000, guid: 42d02ed38d3bff542b7e496e1416128e, type: 3}
+  - {fileID: 21300000, guid: 1ce6d9e36c8575647a72e9987416eb5c, type: 3}
+  - {fileID: 21300000, guid: b979ce8733c23ef41bf9d91516a55fb4, type: 3}
+  - {fileID: 21300000, guid: 0df363c92fc22c7409f50e3c00dc77f5, type: 3}
+  - {fileID: 21300000, guid: 42e9454786234ff488c6a455703df636, type: 3}
+  - {fileID: 21300000, guid: 310c09a9dd2debf468990d881f9e276d, type: 3}
+  - {fileID: 21300000, guid: ec996068afc7e4446b624fe4f4a69d01, type: 3}
+  - {fileID: 21300000, guid: 90ca241558711c14b9fa7f8ad2ee3754, type: 3}
+  - {fileID: 21300000, guid: 176430ea2f6b7af489b7e3b9e8442845, type: 3}
+  - {fileID: 21300000, guid: 8e2a73f384a898145965119b15879da5, type: 3}
+  - {fileID: 21300000, guid: 078e4fdb498ae8e479689af982470245, type: 3}
+  - {fileID: 21300000, guid: ffcb3bbfebd249446bb7d3a113f6d636, type: 3}
+  - {fileID: 21300000, guid: 04e37d768c876c842bf805e478eba619, type: 3}
+  frame: {fileID: 2800000, guid: 1063add30d70eb24ab7fbf0bb5024b31, type: 3}
+  background: {fileID: 11400000, guid: a0e3c6de5d4ca0f469dde7091d128dc2, type: 2}
+  neutral: {fileID: 11400000, guid: 772a2a5615f8da044b52f64c41824c65, type: 2}

@@ -49,9 +49,13 @@ namespace ShardsOfTheLimit.Presentation
             foreach (StatusDefinition definition in Resources.LoadAll<StatusDefinition>("Prototype/Statuses"))
             {
                 if (definition.icon != null) statusIcons[definition.stableId] = definition.icon;
+                if (definition.paletteOverride != null) statusPalettes[definition.stableId] = definition.paletteOverride;
             }
 
             if (burningIcon != null) statusIcons[BurningCalculator.ResistanceId] = burningIcon;
+            // Burning is not a status asset: its master icon is colored with the fire palette.
+            ResonantPalette fire = Resources.Load<ResonantPalette>("Prototype/Palettes/fire");
+            if (fire != null) statusPalettes[BurningCalculator.ResistanceId] = fire;
             Sprite geyser = Resources.Load<AbilityDefinition>("Prototype/Abilities/FireGeyser")?.Icon;
             if (geyser != null) statusIcons["GEYSER"] = geyser;
         }
@@ -120,10 +124,28 @@ namespace ShardsOfTheLimit.Presentation
             Fill(new Rect(rect.x + 1f, rect.y + 1f, (rect.width - 2f) * Mathf.Clamp01(fraction), rect.height - 2f), color);
         }
 
-        private void Icon(Rect rect, Sprite sprite)
+        /// <summary>
+        /// Draws an icon. A grayscale master from Abilities_v3 is colored by <paramref name="palette"/> (neutral when null)
+        /// through <see cref="IconTintCache"/>; any other sprite is drawn as it is.
+        /// </summary>
+        private void Icon(Rect rect, Sprite sprite, ResonantPalette palette = null)
         {
-            if (sprite != null) GUI.DrawTexture(rect, sprite.texture, ScaleMode.ScaleAndCrop, true);
+            if (sprite == null) return;
+            Texture tinted = IconTintCache.IsMaster(sprite) ? IconTintCache.Get(sprite, palette) : null;
+            GUI.DrawTexture(rect, tinted != null ? tinted : sprite.texture, ScaleMode.ScaleAndCrop, true);
         }
+
+        /// <summary>An ability is colored by its owner's palette unless the ability overrides it (e.g. blood for Blood Dash).</summary>
+        private ResonantPalette PaletteFor(CombatUnit owner, AbilityDefinition ability)
+        {
+            if (ability != null && ability.PaletteOverride != null) return ability.PaletteOverride;
+            return owner != null && definitionsByUnit.TryGetValue(owner, out UnitDefinition definition) ? definition.Palette : null;
+        }
+
+        private ResonantPalette PaletteOf(CombatUnit owner) =>
+            owner != null && definitionsByUnit.TryGetValue(owner, out UnitDefinition definition) ? definition.Palette : null;
+
+        private readonly Dictionary<string, ResonantPalette> statusPalettes = new Dictionary<string, ResonantPalette>();
 
         private void DrawTopBar(CombatUnit active)
         {
@@ -160,7 +182,8 @@ namespace ShardsOfTheLimit.Presentation
                     Fill(rect, new Color(0f, 0f, 0f, 0.55f));
                     string id = ResolveTimelineStatusId(timelineEvent.StatusId ?? string.Empty);
                     if (statusIcons.TryGetValue(id, out Sprite statusIcon))
-                        Icon(new Rect(rect.x + rect.width * 0.25f, rect.y + rect.height * 0.25f, rect.width * 0.5f, rect.height * 0.5f), statusIcon);
+                        Icon(new Rect(rect.x + rect.width * 0.25f, rect.y + rect.height * 0.25f, rect.width * 0.5f, rect.height * 0.5f), statusIcon,
+                            statusPalettes.TryGetValue(id, out ResonantPalette timelinePalette) ? timelinePalette : null);
                     else
                         GUI.Label(rect, id == "MOVE CLOUD" ? "≈>" : id.Length > 5 ? id.Substring(0, 5) : id, hudBadgeStyle);
                 }
@@ -231,10 +254,31 @@ namespace ShardsOfTheLimit.Presentation
             // Branch passive (the part after the species name), e.g. "Twin Eruption"; B cycles it and restarts.
             string branch = BranchVariantName(active);
             if (branch.Contains("·")) branch = branch.Substring(branch.IndexOf('·') + 1).Trim();
+            float branchX = x + 72f;
+            PassiveModifierDefinition branchModifiers = ModifiersOf(active);
+            Rect branchArea = new Rect(branchX, panel.y + 72f, width - 72f, 22f);
+            if (branchModifiers != null && branchModifiers.icon != null)
+            {
+                // Branch passive icons (square: they belong to the resonant), colored like its abilities.
+                Icon(new Rect(branchX, panel.y + 73f, 20f, 20f), branchModifiers.icon,
+                    branchModifiers.paletteOverride != null ? branchModifiers.paletteOverride : PaletteOf(active));
+                branchX += 22f;
+                if (branchModifiers.secondaryIcon != null)
+                {
+                    Icon(new Rect(branchX, panel.y + 73f, 20f, 20f), branchModifiers.secondaryIcon,
+                        branchModifiers.secondaryPaletteOverride != null ? branchModifiers.secondaryPaletteOverride : PaletteOf(active));
+                    branchX += 22f;
+                }
+            }
+
             if (branch.Length > 0)
-                GUI.Label(new Rect(x + 72f, panel.y + 74f, width - 72f, 18f),
+                GUI.Label(new Rect(branchX + 2f, panel.y + 74f, panel.xMax - branchX - 12f, 18f),
                     definition != null && definition.BranchVariants.Count > 1 && active.ControlType == ControlType.Player
                         ? $"{branch} [B]" : branch, hudSmallStyle);
+            if (branchModifiers != null && branchArea.Contains(Event.current.mousePosition))
+                DrawTextTooltip(new Rect(panel.x, panel.y, panel.width, 0f), BranchVariantName(active),
+                    "Ветка резонанта: её пассивки и числа из карточки. B — сменить ветку (бой начнётся заново).",
+                    branchModifiers.icon, branchModifiers.paletteOverride != null ? branchModifiers.paletteOverride : PaletteOf(active));
             DrawStatusIcons(active, new Rect(panel.x + 10f, panel.y + 102f, panel.width - 20f, 28f), 26f);
         }
 
@@ -245,7 +289,8 @@ namespace ShardsOfTheLimit.Presentation
             {
                 var rect = new Rect(x, area.y, size, size);
                 Fill(rect, new Color(0f, 0f, 0f, 0.6f));
-                if (statusIcons.TryGetValue(id, out Sprite icon)) Icon(rect, icon);
+                if (statusIcons.TryGetValue(id, out Sprite icon))
+                    Icon(rect, icon, statusPalettes.TryGetValue(id, out ResonantPalette statusPalette) ? statusPalette : null);
                 else GUI.Label(rect, id.Substring(0, Mathf.Min(3, id.Length)), hudBadgeStyle);
                 if (stacks > 1)
                 {
@@ -265,6 +310,9 @@ namespace ShardsOfTheLimit.Presentation
                     $"Горение {unit.BurningState.DamagePerPulse}/100 тиков, ещё {unit.BurningState.RemainingPulses()}");
             foreach (StackStatusState state in unit.Statuses.Values)
                 yield return (state.Rules.Id, state.Stacks, $"{state.Rules.Id} ×{state.Stacks} до тика {state.ExpireTick}");
+            MagmaCell magma = areaEffects?.MagmaAt(unit.Cell);
+            if (magma != null)
+                yield return (AreaEffectWorld.MagmaResistanceId, 1, $"Стоит на Магме: {magma.Power} каждые 100 тиков, до тика {magma.ExpireTick}");
         }
 
         private void DrawAbilityBar(CombatUnit active)
@@ -292,9 +340,19 @@ namespace ShardsOfTheLimit.Presentation
             GUI.enabled = canAct;
             Fill(new Rect(moveRect.x - 2f, moveRect.y - 2f, moveRect.width + 4f, moveRect.height + 4f),
                 moving && canAct ? new Color(0.35f, 0.75f, 1f) : new Color(0.25f, 0.25f, 0.28f));
-            if (GUI.Button(moveRect, active.MovementMode == MovementMode.Burrow ? "ПОД\nЗЕМЛЁЙ\n2 ОД" : "ХОД\n1 ОД", hudButtonStyle))
+            Sprite movementIcon = definition != null && active.MovementMode == MovementMode.Burrow ? definition.MovementIcon : null;
+            if (GUI.Button(moveRect, movementIcon != null ? GUIContent.none
+                    : new GUIContent(active.MovementMode == MovementMode.Burrow ? "ПОД\nЗЕМЛЁЙ\n2 ОД" : "ХОД\n1 ОД"), hudButtonStyle))
             {
                 CancelAbility();
+            }
+
+            if (movementIcon != null)
+            {
+                // Deep Burrow: the worm's movement has its own icon.
+                Icon(new Rect(moveRect.x + 4f, moveRect.y + 4f, moveRect.width - 8f, moveRect.height - 8f), movementIcon, PaletteOf(active));
+                for (int ap = 0; ap < active.MovementActionCost; ap++)
+                    Fill(new Rect(moveRect.xMax - 12f - ap * 12f, moveRect.y + 4f, 8f, 8f), new Color(1f, 0.82f, 0.25f));
             }
 
             if (moveRect.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -2;
@@ -318,7 +376,8 @@ namespace ShardsOfTheLimit.Presentation
                 }
 
                 GUI.enabled = true;
-                if (ability.Icon != null) Icon(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f), ability.Icon);
+                if (ability.Icon != null)
+                    Icon(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f), ability.Icon, PaletteFor(active, ability));
                 if (!usable) Fill(rect, new Color(0f, 0f, 0f, 0.55f));
                 if (cooldown > 0) GUI.Label(rect, $"КД {cooldown}", hudTitleStyle.Center());
                 Fill(new Rect(rect.x, rect.y, 18f, 18f), new Color(0f, 0f, 0f, 0.75f));
@@ -341,7 +400,17 @@ namespace ShardsOfTheLimit.Presentation
                 GUI.enabled = canAct;
                 Fill(new Rect(surface.x - 2f, surface.y - 2f, surface.width + 4f, surface.height + 4f),
                     wallMode ? new Color(0.95f, 0.78f, 0.35f) : new Color(0.3f, 0.3f, 0.33f));
-                if (GUI.Button(surface, wallMode ? "СТЕНА\n(Tab)" : "ПОЛ\n(Tab)", hudButtonStyle)) ToggleWallMode();
+                Sprite surfaceIcon = definition != null ? definition.PassiveIcon : null;
+                if (GUI.Button(surface, surfaceIcon != null ? GUIContent.none : new GUIContent(wallMode ? "СТЕНА\n(Tab)" : "ПОЛ\n(Tab)"),
+                        hudButtonStyle)) ToggleWallMode();
+                if (surfaceIcon != null)
+                {
+                    // Ritual Surfaces icon with the current mode written over it.
+                    Icon(new Rect(surface.x + 4f, surface.y + 4f, surface.width - 8f, surface.height - 8f), surfaceIcon, PaletteOf(active));
+                    Fill(new Rect(surface.x, surface.yMax - 18f, surface.width, 18f), new Color(0f, 0f, 0f, 0.7f));
+                    GUI.Label(new Rect(surface.x, surface.yMax - 18f, surface.width, 18f), wallMode ? "СТЕНА · Tab" : "ПОЛ · Tab", hudBadgeStyle);
+                }
+
                 if (surface.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -3;
                 GUI.enabled = true;
             }
@@ -354,64 +423,16 @@ namespace ShardsOfTheLimit.Presentation
             GUI.enabled = true;
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
-            else if (hoveredAbilityIndex == -4 && hoveredReserveIndex >= 0 && hoveredReserveIndex < reserve.Count)
-                DrawTextTooltip(panel, "Вызов: " + reserve[hoveredReserveIndex].Unit.DisplayName,
-                    $"1 ОД. Активный резонант {ReserveRules.SwapTicks} тиков получает +100% урона и продолжает действовать, " +
-                    "затем уходит в камень (эффект отзыва, отрицательные эффекты снимаются), а вызванный выходит на его место " +
-                    "(эффект входа). Если активный падёт раньше, замены не будет. " +
-                    $"Здоровье {reserve[hoveredReserveIndex].Unit.CurrentHealth}/{reserve[hoveredReserveIndex].Unit.MaximumHealth}.");
             else if (hoveredAbilityIndex == -3) DrawTextTooltip(panel, "Ритуальные поверхности",
                 "Способности «Поверхность» применяются к полу или к стене. Стена — столб на 2+ единицы выше соседней клетки " +
-                "или препятствие, обращённое к тотему; эффект выходит из неё перпендикулярно в клетку перед ней.");
-            else if (hoveredAbilityIndex == -2) DrawTextTooltip(panel, "Перемещение",
+                "или препятствие, обращённое к тотему; эффект выходит из неё перпендикулярно в клетку перед ней.",
+                definition != null ? definition.PassiveIcon : null, PaletteOf(active));
+            else if (hoveredAbilityIndex == -2) DrawTextTooltip(panel, active.MovementMode == MovementMode.Burrow ? "Подземный ход" : "Перемещение",
                 active.MovementMode == MovementMode.Burrow
                     ? $"Подземный ход: 2 ОД, выныривает в любой свободной клетке в радиусе {MovementBudget(active)}. Высота и стены не мешают."
-                    : $"Шаг по клеткам: {MovementBudget(active)} очков передвижения за 1 ОД. Подъём стоит дороже.");
+                    : $"Шаг по клеткам: {MovementBudget(active)} очков передвижения за 1 ОД. Подъём стоит дороже.",
+                movementIcon, PaletteOf(active));
         }
-
-        private bool ShowsReserve(CombatUnit active) => active != null && active.Team == Team.Player &&
-                                                        active.ControlType == ControlType.Player && reserve.Count > 0;
-
-        /// <summary>Reserve on every player turn: one button per reserve resonant to call it in place of the active one.</summary>
-        private float DrawReserveButtons(CombatUnit active, float x, float y, bool canAct)
-        {
-            bool ready = CallBlockReason(active) == null;
-            for (int index = 0; index < reserve.Count; index++)
-            {
-                ReserveSlot slot = reserve[index];
-                var rect = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
-                bool available = canAct && ready && slot.IsAvailable(turns.CurrentTick);
-                bool selected = slot.IsCalled;
-                Fill(new Rect(rect.x - 2f, rect.y - 2f, rect.width + 4f, rect.height + 4f),
-                    selected ? new Color(1f, 0.85f, 0.3f) : available ? new Color(0.55f, 0.48f, 0.35f) : new Color(0.2f, 0.2f, 0.22f));
-                GUI.enabled = available;
-                Sprite portrait = definitionsByUnit.TryGetValue(slot.Unit, out UnitDefinition reserveDefinition) ? reserveDefinition.Portrait : null;
-                if (GUI.Button(rect, portrait != null ? GUIContent.none : new GUIContent("ВЫЗОВ\n" + slot.Unit.DisplayName), hudButtonStyle))
-                    RequestCall(index);
-
-                GUI.enabled = true;
-                if (portrait != null) Icon(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f), portrait);
-                if (!available) Fill(rect, new Color(0f, 0f, 0f, 0.55f));
-                if (slot.Unit.IsDefeated) GUI.Label(rect, "ПАЛ", hudTitleStyle.Center());
-                else if (slot.IsCalled) GUI.Label(rect, "ИДЁТ", hudTitleStyle.Center());
-                else if (!slot.IsAvailable(turns.CurrentTick)) GUI.Label(rect, $"{slot.AvailableTick}т", hudTitleStyle.Center());
-                Bar(new Rect(rect.x + 3f, rect.yMax - 8f, rect.width - 6f, 5f),
-                    slot.Unit.CurrentHealth / (float)slot.Unit.MaximumHealth, HealthColor);
-                Fill(new Rect(rect.x, rect.y, 18f, 18f), new Color(0f, 0f, 0f, 0.75f));
-                GUI.Label(new Rect(rect.x, rect.y, 18f, 18f), index == 0 ? "Z" : index == 1 ? "X" : string.Empty, hudBadgeStyle);
-                if (rect.Contains(Event.current.mousePosition))
-                {
-                    hoveredAbilityIndex = -4;
-                    hoveredReserveIndex = index;
-                }
-
-                x += AbilityButtonSize + 8f;
-            }
-
-            return x;
-        }
-
-        private int hoveredReserveIndex = -1;
 
         private void DrawAbilityTooltip(AbilityDefinition ability, CombatUnit active, Rect anchor)
         {
@@ -422,10 +443,10 @@ namespace ShardsOfTheLimit.Presentation
             int cooldown = active.GetCooldown(ability.StableId);
             string body = $"{kind} · {range} · {ability.ActionCost} ОД · КД {ability.Cooldown}" +
                           (cooldown > 0 ? $" (ещё {cooldown})" : string.Empty) + "\n" + ability.Description;
-            DrawTextTooltip(anchor, ability.DisplayName, body, ability.Icon);
+            DrawTextTooltip(anchor, ability.DisplayName, body, ability.Icon, PaletteFor(active, ability));
         }
 
-        private void DrawTextTooltip(Rect anchor, string title, string body, Sprite icon = null)
+        private void DrawTextTooltip(Rect anchor, string title, string body, Sprite icon = null, ResonantPalette palette = null)
         {
             float width = 380f;
             float height = hudTextStyle.CalcHeight(new GUIContent(body), width - 24f) + 42f;
@@ -434,7 +455,7 @@ namespace ShardsOfTheLimit.Presentation
             float textX = rect.x + 12f;
             if (icon != null)
             {
-                Icon(new Rect(rect.x + 10f, rect.y + 8f, 26f, 26f), icon);
+                Icon(new Rect(rect.x + 10f, rect.y + 8f, 26f, 26f), icon, palette);
                 textX += 32f;
             }
 

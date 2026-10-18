@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Earth Pillar
   description: Surface, Terrain. Raises a floor cell within 4 by 2 levels together
     with whoever stands on it. Stays until the end of the battle.
-  icon: {fileID: 21300000, guid: 23a9acdf1c3596f46a3f3a5f78f59b8c, type: 3}
+  icon: {fileID: 21300000, guid: 660d632e22f071b4a8750b44ecc9eb69, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 3
   targetType: 0

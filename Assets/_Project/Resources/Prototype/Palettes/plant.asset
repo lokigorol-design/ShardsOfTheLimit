@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4e46020d182b3745b4dd88c67824dd9, type: 3}
+  m_Name: plant
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.ResonantPalette
+  paletteName: plant
+  effectStops:
+  - position: 0
+    color:
+      serializedVersion: 2
+      rgba: 4278322439
+  - position: 0.2
+    color:
+      serializedVersion: 2
+      rgba: 4278983722
+  - position: 0.38
+    color:
+      serializedVersion: 2
+      rgba: 4279778394
+  - position: 0.56
+    color:
+      serializedVersion: 2
+      rgba: 4280056398
+  - position: 0.74
+    color:
+      serializedVersion: 2
+      rgba: 4281647238
+  - position: 0.88
+    color:
+      serializedVersion: 2
+      rgba: 4285197512
+  - position: 1
+    color:
+      serializedVersion: 2
+      rgba: 4292411380
+  backgroundStops: []
+  tintColor:
+    serializedVersion: 2
+    rgba: 4282137871
+  tintStrength: 0.12
+  maskLow: 0.16
+  maskHigh: 0.42

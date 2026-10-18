@@ -16,15 +16,24 @@ MonoBehaviour:
   displayName: Crimson Brute
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 0}
+  visualRotationOffset: {x: 0, y: 0, z: 0}
   maximumHealth: 140
   maximumShield: 50
   attack: 19
   defense: 5
   speed: 8
   movementRange: 3
+  movementMode: 0
+  movementActionCost: 1
   periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b1111111111111111111111111111111, type: 2}
   - {fileID: 11400000, guid: b2222222222222222222222222222222, type: 2}
   - {fileID: 11400000, guid: b6666666666666666666666666666666, type: 2}
   - {fileID: 11400000, guid: b7777777777777777777777777777777, type: 2}
+  palette: {fileID: 11400000, guid: 772a2a5615f8da044b52f64c41824c65, type: 2}
+  movementIcon: {fileID: 0}
+  passiveIcon: {fileID: 0}
+  passiveModifiers: {fileID: 0}
+  branchVariants: []

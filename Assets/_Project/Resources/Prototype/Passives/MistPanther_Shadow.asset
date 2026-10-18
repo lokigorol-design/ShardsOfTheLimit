@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: MistPanther_Shadow
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
   variantName: "Shadow Panther \xB7 Silent Executioner"
+  icon: {fileID: 21300000, guid: 839c33a575f559141844cfcd0bcf8d35, type: 3}
+  secondaryIcon: {fileID: 21300000, guid: 42d02ed38d3bff542b7e496e1416128e, type: 3}
+  paletteOverride: {fileID: 0}
+  secondaryPaletteOverride: {fileID: 0}
   healthMultiplier: 0.85
   attackMultiplier: 1.15
   defenseMultiplier: 1

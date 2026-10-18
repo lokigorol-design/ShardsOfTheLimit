@@ -17,7 +17,8 @@ MonoBehaviour:
   description: 'Ranged, Surface. Point within 4: the first resonant on a straight
     line from the point within 2 cells is pulled onto it; 1 x ATK and Immobilize
     for 1 turn.'
-  icon: {fileID: 21300000, guid: 95dca251342185b47a3b3ac9818d8daf, type: 3}
+  icon: {fileID: 21300000, guid: 90ca241558711c14b9fa7f8ad2ee3754, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 2
   targetType: 0

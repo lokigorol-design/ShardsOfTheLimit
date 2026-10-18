@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Fire Geyser
   description: 'Surface, Delayed. Marks a point within 4; after 100 ticks a jet of
     fire bursts up from it: 0,8 x ATK and Burning. The mark is visible to everyone.'
-  icon: {fileID: 21300000, guid: 3bfcd14112b5528489e9e4bc60908ae2, type: 3}
+  icon: {fileID: 21300000, guid: f3c357faf17e1a94b864ae6150926eb7, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 2
   targetType: 0

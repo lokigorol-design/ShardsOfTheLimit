@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: MistPanther_Mist
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
   variantName: "Mist Panther \xB7 Deep Wounds"
+  icon: {fileID: 21300000, guid: 060b47ab68a368e43a93a2601e076d3f, type: 3}
+  secondaryIcon: {fileID: 21300000, guid: bee675d0e606e7742afeb07b9b44eeb2, type: 3}
+  paletteOverride: {fileID: 0}
+  secondaryPaletteOverride: {fileID: 11400000, guid: 2b69c8eba7aed36409e4844511161db7, type: 2}
   healthMultiplier: 1.15
   attackMultiplier: 0.9
   defenseMultiplier: 1.1

@@ -16,14 +16,23 @@ MonoBehaviour:
   displayName: Amber Raider
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 0}
+  visualRotationOffset: {x: 0, y: 0, z: 0}
   maximumHealth: 85
   maximumShield: 30
   attack: 17
   defense: 2
   speed: 11
   movementRange: 4
+  movementMode: 0
+  movementActionCost: 1
   periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b4444444444444444444444444444444, type: 2}
   - {fileID: 11400000, guid: 20000000000000000000000000000004, type: 2}
   - {fileID: 11400000, guid: b5555555555555555555555555555555, type: 2}
+  palette: {fileID: 11400000, guid: 772a2a5615f8da044b52f64c41824c65, type: 2}
+  movementIcon: {fileID: 0}
+  passiveIcon: {fileID: 0}
+  passiveModifiers: {fileID: 0}
+  branchVariants: []

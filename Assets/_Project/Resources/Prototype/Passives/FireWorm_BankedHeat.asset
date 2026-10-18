@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: FireWorm_BankedHeat
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
   variantName: "Fire Worm \xB7 Banked Heat"
+  icon: {fileID: 21300000, guid: ea883426c2f7c0b4b8745b59ea9fb7a6, type: 3}
+  secondaryIcon: {fileID: 0}
+  paletteOverride: {fileID: 0}
+  secondaryPaletteOverride: {fileID: 0}
   healthMultiplier: 1
   attackMultiplier: 1.15
   defenseMultiplier: 0.9
@@ -35,3 +39,8 @@ MonoBehaviour:
   stormOvercharge: 0
   titanPillar: 0
   ragingTornado: 0
+  mistVeil: 0
+  deepWounds: 0
+  returnToShadow: 0
+  vanishingAbility: {fileID: 0}
+  silentExecutioner: 0

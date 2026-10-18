@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: PrimalIdol_StormOvercharge
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.PassiveModifierDefinition
   variantName: "Primal Idol \xB7 Storm Overcharge"
+  icon: {fileID: 21300000, guid: 176430ea2f6b7af489b7e3b9e8442845, type: 3}
+  secondaryIcon: {fileID: 0}
+  paletteOverride: {fileID: 0}
+  secondaryPaletteOverride: {fileID: 0}
   healthMultiplier: 1
   attackMultiplier: 1
   defenseMultiplier: 0.9
@@ -35,3 +39,8 @@ MonoBehaviour:
   stormOvercharge: 1
   titanPillar: 0
   ragingTornado: 0
+  mistVeil: 0
+  deepWounds: 0
+  returnToShadow: 0
+  vanishingAbility: {fileID: 0}
+  silentExecutioner: 0

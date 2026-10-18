@@ -14,8 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: blaze-fiery-spit
   displayName: Fire Spit
-  description: Ranged, one target within 4. 0,5 x ATK and Burning (0,25 x ATK every 100 ticks, 3 turns).
-  icon: {fileID: 21300000, guid: 60000000000000000000000000000012, type: 3}
+  description: Ranged, one target within 4. 0,5 x ATK and Burning (0,25 x ATK every
+    100 ticks, 3 turns).
+  icon: {fileID: 21300000, guid: 2120646c66f497d4b97b829e5c91287b, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 1
   targetType: 0

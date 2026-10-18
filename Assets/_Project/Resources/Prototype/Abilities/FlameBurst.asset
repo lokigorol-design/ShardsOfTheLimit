@@ -19,7 +19,8 @@ MonoBehaviour:
     in the cone and everything entering it takes 0,8 \u2192 1,0 \u2192 1,2 \xD7 ATK
     and Burning. While it lasts the worm neither moves nor uses other abilities.
     Cooldown 3 after it ends."
-  icon: {fileID: 21300000, guid: a40bdc65b4e0dc140a6f935a330d3e6c, type: 3}
+  icon: {fileID: 21300000, guid: 74fd1d157901a3944be577ce80d0c583, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 0
   targetType: 0

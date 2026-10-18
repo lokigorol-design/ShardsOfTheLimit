@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: Invisibility
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
   stableId: INVISIBILITY
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 0df363c92fc22c7409f50e3c00dc77f5, type: 3}
+  paletteOverride: {fileID: 11400000, guid: 095781e5490055b468eafb8909eefc93, type: 2}
   mechanic: 7
   maximumStacks: 1
   durationTicks: 200

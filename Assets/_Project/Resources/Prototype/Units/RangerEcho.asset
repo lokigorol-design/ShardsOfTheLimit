@@ -16,15 +16,24 @@ MonoBehaviour:
   displayName: Cobalt Ranger
   portrait: {fileID: 0}
   visualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 0}
+  visualRotationOffset: {x: 0, y: 0, z: 0}
   maximumHealth: 90
   maximumShield: 40
   attack: 17
   defense: 2
   speed: 10
   movementRange: 4
+  movementMode: 0
+  movementActionCost: 1
   periodicResistances: []
   abilities:
   - {fileID: 11400000, guid: b3333333333333333333333333333333, type: 2}
   - {fileID: 11400000, guid: 20000000000000000000000000000004, type: 2}
   - {fileID: 11400000, guid: b5555555555555555555555555555555, type: 2}
   - {fileID: 11400000, guid: b8888888888888888888888888888888, type: 2}
+  palette: {fileID: 11400000, guid: 772a2a5615f8da044b52f64c41824c65, type: 2}
+  movementIcon: {fileID: 0}
+  passiveIcon: {fileID: 0}
+  passiveModifiers: {fileID: 0}
+  branchVariants: []

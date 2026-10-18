@@ -32,6 +32,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 827e7b8cea6137540bd0aa980eb71ffb, type: 2}
   - {fileID: 11400000, guid: 0c201190ba6097441a39878bfbda5575, type: 2}
   - {fileID: 11400000, guid: f94d98e2211a93c43bdc72d1b6d4a215, type: 2}
+  palette: {fileID: 11400000, guid: cbc8b4bdc57900446a8e8a7a0444b048, type: 2}
+  movementIcon: {fileID: 0}
+  passiveIcon: {fileID: 21300000, guid: b3e3d6b645aa19741963fe4d1f20a60a, type: 3}
   passiveModifiers: {fileID: 0}
   branchVariants:
   - {fileID: 11400000, guid: 3b5d5c4508b2f5c47983c31d7db8500f, type: 2}

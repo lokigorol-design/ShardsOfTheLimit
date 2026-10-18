@@ -17,7 +17,8 @@ MonoBehaviour:
   description: Buff, self. Invisibility for 2 turns or until the first attack; the
     first attack from Invisibility deals +40%. With Mist Veil the panther goes into
     Mist instead.
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ffcb3bbfebd249446bb7d3a113f6d636, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 3
   targetType: 1

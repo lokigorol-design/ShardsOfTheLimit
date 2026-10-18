@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.UnitDefinition
   stableId: mist-panther
   displayName: Mist Panther
-  portrait: {fileID: 0}
-  visualPrefab: {fileID: 0}
-  visualMaterial: {fileID: 0}
+  portrait: {fileID: 21300000, guid: 099c352d5d3606640972cd68f31643b3, type: 3}
+  visualPrefab: {fileID: 3153645841097671985, guid: 367e92346e1fa8d4fac576fbb108269f, type: 3}
+  visualMaterial: {fileID: 2100000, guid: 59700cfc61ef151428f4c94d1519c097, type: 2}
   visualRotationOffset: {x: 0, y: 0, z: 0}
   maximumHealth: 80
   maximumShield: 40
@@ -32,6 +32,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 8563dad7bb3ccab4dbfc68da1debcf7a, type: 2}
   - {fileID: 11400000, guid: df5d5fd8fb30fdf40857a4687eadb079, type: 2}
   - {fileID: 11400000, guid: 6cbeb430a64f95e46a7ec7b5d289ebd1, type: 2}
+  palette: {fileID: 11400000, guid: 095781e5490055b468eafb8909eefc93, type: 2}
+  movementIcon: {fileID: 0}
+  passiveIcon: {fileID: 0}
   passiveModifiers: {fileID: 0}
   branchVariants:
   - {fileID: 11400000, guid: 4ff66b219adb10d4f9e072c51c491b06, type: 2}

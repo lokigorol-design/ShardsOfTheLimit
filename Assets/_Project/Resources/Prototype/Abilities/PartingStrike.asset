@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Parting Strike
   description: "Melee. A neighbouring enemy is knocked back 1 cell and the panther
     leaps 1 cell back: 0,5 \xD7 ATK."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: a2d7923569a9a274fb6df88e8ea95ea3, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 2
   targetType: 1

@@ -17,7 +17,8 @@ MonoBehaviour:
   description: "Buff, self. For 3 turns: at the start of each own turn the worm cleanses
     every negative effect; whoever hits it with a Melee ability catches fire (0,25
     \xD7 worm ATK)."
-  icon: {fileID: 21300000, guid: 21b9340f487d1a74c9f379c987355250, type: 3}
+  icon: {fileID: 21300000, guid: 456f96acda89f8b478f75316c6aad66f, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 5
   targetType: 1

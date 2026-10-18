@@ -51,11 +51,16 @@ public static class PlaytestBuild
     /// </summary>
     private static void KeepRuntimeShaders()
     {
-        const string path = "Assets/_Project/Resources/Prototype/Rendering/KeepVfxParticleShader.mat";
-        if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
-        Shader shader = Shader.Find("Shards/VfxParticle");
-        if (shader == null) return;
-        AssetDatabase.CreateAsset(new Material(shader) { name = "KeepVfxParticleShader" }, path);
+        Keep("Shards/VfxParticle", "Assets/_Project/Resources/Prototype/Rendering/KeepVfxParticleShader.mat");
+        Keep("Shards/IconGradientMap", "Assets/_Project/Resources/Prototype/Rendering/KeepIconGradientMapShader.mat");
         AssetDatabase.SaveAssets();
+    }
+
+    private static void Keep(string shaderName, string path)
+    {
+        if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
+        Shader shader = Shader.Find(shaderName);
+        if (shader == null) return;
+        AssetDatabase.CreateAsset(new Material(shader) { name = Path.GetFileNameWithoutExtension(path) }, path);
     }
 }

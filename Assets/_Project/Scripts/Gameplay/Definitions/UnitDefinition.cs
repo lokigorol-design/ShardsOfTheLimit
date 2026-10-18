@@ -38,6 +38,14 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField, Tooltip("\"Защита от периодического урона\" per source, e.g. BURNING 50.")]
         private List<PeriodicResistance> periodicResistances = new List<PeriodicResistance>();
         [SerializeField] private List<AbilityDefinition> abilities = new List<AbilityDefinition>();
+        [Header("Icons (design 2.5 masters are colored by this palette)")]
+        [SerializeField, Tooltip("Colors of this resonant's icon masters; empty = neutral.")] private ResonantPalette palette;
+        [SerializeField, Tooltip("Icon of the movement button, e.g. Deep Burrow.")] private Sprite movementIcon;
+        [SerializeField, Tooltip("Icon of the resonant's own passive, e.g. Ritual Surfaces.")] private Sprite passiveIcon;
+        public ResonantPalette Palette => palette;
+        public Sprite MovementIcon => movementIcon;
+        public Sprite PassiveIcon => passiveIcon;
+
         [SerializeField] private PassiveModifierDefinition passiveModifiers;
         public PassiveModifierDefinition PassiveModifiers => passiveModifiers;
         [SerializeField, Tooltip("Branch variants (II/IV choices) selectable before a battle; the first is the default.")]

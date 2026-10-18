@@ -17,7 +17,8 @@ MonoBehaviour:
   description: Surface, Trap. A whirlwind trap on a free floor cell within 4. The
     first resonant to enter it, allies included, is thrown 4 units up and loses 10%
     of maximum health on landing. Lives 3 turns.
-  icon: {fileID: 21300000, guid: bd54aae9dcdbec24a8ac21b2c06baea2, type: 3}
+  icon: {fileID: 21300000, guid: c19db9e7546bf0f4f910a239ba75f0f9, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 3
   targetType: 0

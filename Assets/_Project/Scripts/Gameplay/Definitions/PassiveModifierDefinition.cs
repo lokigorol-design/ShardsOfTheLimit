@@ -11,6 +11,12 @@ namespace ShardsOfTheLimit.Definitions
     {
         [Tooltip("Shown in the HUD, e.g. \"Magma Worm · Blood of the Deep\".")]
         public string variantName;
+        [Tooltip("Icon of the branch passive (and a second one when the branch carries two passives).")]
+        public Sprite icon;
+        public Sprite secondaryIcon;
+        [Tooltip("Optional palette instead of the owner's, e.g. blood for Deep Wounds.")]
+        public ResonantPalette paletteOverride;
+        public ResonantPalette secondaryPaletteOverride;
 
         [Header("Branch stat changes (e.g. HP ×1,15)")]
         [Min(0.1f)] public float healthMultiplier = 1f;

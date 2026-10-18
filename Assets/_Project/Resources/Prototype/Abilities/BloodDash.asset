@@ -16,7 +16,8 @@ MonoBehaviour:
   displayName: Blood Dash
   description: "Melee, Dash. Runs up to 3 cells straight at an enemy on one of its
     lines: 0,9 \xD7 ATK and Bleed."
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: d2dcb6ac82a185c46898bfcde16fc709, type: 3}
+  paletteOverride: {fileID: 11400000, guid: 2b69c8eba7aed36409e4844511161db7, type: 2}
   actionCost: 1
   cooldown: 2
   targetType: 1

@@ -14,8 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
   stableId: blaze-long-bite
   displayName: Long Bite
-  description: Melee. Bites along a straight line up to 2 cells; hits the first resonant on the line. 1,1 x ATK.
-  icon: {fileID: 21300000, guid: 60000000000000000000000000000011, type: 3}
+  description: Melee. Bites along a straight line up to 2 cells; hits the first resonant
+    on the line. 1,1 x ATK.
+  icon: {fileID: 21300000, guid: 97480efc2be12d84285c9bc38b54878b, type: 3}
+  paletteOverride: {fileID: 0}
   actionCost: 1
   cooldown: 1
   targetType: 1

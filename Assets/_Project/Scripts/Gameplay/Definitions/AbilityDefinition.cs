@@ -13,6 +13,8 @@ namespace ShardsOfTheLimit.Definitions
         [SerializeField] private string displayName = "Ability";
         [SerializeField, TextArea] private string description = string.Empty;
         [SerializeField] private Sprite icon = null;
+        [SerializeField, Tooltip("Colors this ability's icon instead of the owner's palette (e.g. blood for Blood Dash).")]
+        private ResonantPalette paletteOverride = null;
 
         [Header("Rules")]
         [SerializeField, Min(0)] private int actionCost = 1;
@@ -33,6 +35,7 @@ namespace ShardsOfTheLimit.Definitions
         public string DisplayName => displayName;
         public string Description => description;
         public Sprite Icon => icon;
+        public ResonantPalette PaletteOverride => paletteOverride;
         public int ActionCost => actionCost;
         public int Cooldown => cooldown;
         public AbilityTargetType TargetType => targetType;

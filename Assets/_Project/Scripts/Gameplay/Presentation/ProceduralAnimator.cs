@@ -5,7 +5,8 @@ using UnityEngine;
 namespace ShardsOfTheLimit.Presentation
 {
     /// <summary>
-    /// Test of procedural animation without rigs: breathing, walking bounce, attack lunge, hit squash and death.
+    /// Test of procedural animation without rigs: walking bounce, attack lunge, hit squash and death. No idle breathing:
+    /// pieces on a tabletop stand still between actions (author's decision).
     /// It animates the model's direct children inside the unit root (the root itself is moved and turned by the
     /// battle), scaling about the model's feet so the model stays on the ground. Child rotations are never touched
     /// while the resonant is alive, so authored model corrections are preserved.
@@ -22,7 +23,6 @@ namespace ShardsOfTheLimit.Presentation
         private readonly List<Part> parts = new List<Part>();
         private float footY;
         private float phase;
-        private float breathAmplitude = 0.025f;
         private float hover;
         private Vector3 lastRootPosition;
         private float walkBlend;
@@ -50,7 +50,6 @@ namespace ShardsOfTheLimit.Presentation
                 parts.Add(new Part { Transform = child, Position = child.localPosition, Scale = child.localScale });
             phase = Random.value * Mathf.PI * 2f;
             hover = levitation;
-            breathAmplitude = levitation > 0f ? 0.012f : 0.025f;
             lastRootPosition = transform.position;
         }
 
@@ -65,8 +64,8 @@ namespace ShardsOfTheLimit.Presentation
             walkBlend = Mathf.MoveTowards(walkBlend, speed > 0.4f ? 1f : 0f, Time.deltaTime * 6f);
             walkCycle += Time.deltaTime * 11f * walkBlend;
 
-            // Breathing about the feet; walking adds a stepping bounce; the idol floats.
-            float breath = 1f + Mathf.Sin(time * 2.6f + phase) * breathAmplitude * (1f - walkBlend);
+            // Walking adds a stepping bounce; the idol floats; actions squash about the feet.
+            const float breath = 1f;
             float squash = 1f - actionSquash;
             float bounce = Mathf.Abs(Mathf.Sin(walkCycle)) * 0.07f * walkBlend;
             float floatY = hover > 0f ? hover + Mathf.Sin(time * 1.7f + phase) * hover * 0.6f : 0f;

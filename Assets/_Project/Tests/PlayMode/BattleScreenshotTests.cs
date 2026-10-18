@@ -54,6 +54,8 @@ namespace ShardsOfTheLimit.Tests
             Call(controller, "PreviewFacing", new GridCoordinate(0, 1));
             yield return new WaitForSeconds(0.4f);
             yield return Capture("01c-idol-facing.png");
+            // A real mouse moving over the editor window during the wait would re-aim the preview; set it again.
+            Call(controller, "PreviewFacing", new GridCoordinate(0, 1));
             controller.RequestEndTurn();
             Assert.That(idol.Facing, Is.EqualTo(new GridCoordinate(0, 1)));
 

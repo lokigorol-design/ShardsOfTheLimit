@@ -71,6 +71,7 @@ namespace ShardsOfTheLimit.Presentation
             DrawTopBar(active);
             DrawActiveUnitCard(active);
             DrawAbilityBar(active);
+            DrawArchonPanel(active);
             DrawHoverCard();
 
             if (showOnboarding) DrawOnboarding();
@@ -275,8 +276,7 @@ namespace ShardsOfTheLimit.Presentation
                 : new AbilityDefinition[0];
             bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
             bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
-            float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0) +
-                          (ShowsReserve(active) ? reserve.Count : 0);
+            float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0);
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
             if (panel.x < 324f) panel.x = 324f;
@@ -299,8 +299,6 @@ namespace ShardsOfTheLimit.Presentation
 
             if (moveRect.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -2;
             x += AbilityButtonSize + 8f;
-
-            if (ShowsReserve(active)) x = DrawReserveButtons(active, x, y, canAct);
 
             for (int index = 0; index < abilities.Count; index++)
             {

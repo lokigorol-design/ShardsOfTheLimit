@@ -8,7 +8,7 @@ using UnityEngine;
 namespace ShardsOfTheLimit.Presentation
 {
     /// <summary>
-    /// Calling a replacement (author's rule, 18.10.2026): on its turn any own resonant spends 1 AP to call a resonant
+    /// Calling a replacement (author's rule, 18.10.2026): on its turn any own resonant spends its whole turn (2 AP) to call a resonant
     /// from the reserve. For 200 ticks the caller takes +100% damage and keeps acting; then the newcomer appears in its
     /// place and the caller goes to the reserve. A fallen caller is not replaced. Entry and recall effects per resonant.
     /// </summary>
@@ -39,7 +39,8 @@ namespace ShardsOfTheLimit.Presentation
         private string CallBlockReason(CombatUnit active)
         {
             if (active == null || active.ControlType != ControlType.Player || isBusy || battleEnded) return "Сейчас не ход игрока.";
-            if (active.CurrentActionPoints < ReserveRules.ActionCost) return "Не осталось ОД.";
+            if (active.CurrentActionPoints < ReserveRules.ActionCost)
+                return $"Вызов занимает весь ход ({ReserveRules.ActionCost} ОД): после действий он недоступен.";
             if (active.Channel != null) return "Пока поддерживается способность, вызов недоступен.";
             if (IsCalling(active)) return $"{active.DisplayName} уже ждёт замену.";
             return null;

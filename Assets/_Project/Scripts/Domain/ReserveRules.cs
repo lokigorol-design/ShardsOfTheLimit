@@ -16,7 +16,8 @@ namespace ShardsOfTheLimit.Domain
         public const double SummoningDamageMultiplier = 2d;
         /// <summary>A resonant that went back to the reserve cannot be called again for 3 average turns.</summary>
         public const int ReturnLockTicks = 300;
-        public const int ActionCost = 1;
+        /// <summary>The call takes the caller's whole turn: it neither moves nor acts.</summary>
+        public const int ActionCost = 2;
         public const string SummoningId = "SUMMONING";
 
         public static StatusRules Summoning => new StatusRules(SummoningId, 1, SwapTicks, 100, 0, false, StatusMechanic.Summoning);

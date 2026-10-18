@@ -36,7 +36,7 @@ namespace ShardsOfTheLimit.Tests
             CombatUnit incoming = controller.Reserve[0].Unit;
             Assert.That(controller.RequestCall(0), Is.True);
             Assert.That(idol.IsSummoning, Is.True, "The caller is vulnerable while it waits.");
-            Assert.That(idol.CurrentActionPoints, Is.EqualTo(1), "The call costs 1 AP; the idol keeps acting.");
+            Assert.That(idol.CurrentActionPoints, Is.Zero, "The call takes the whole turn (2 AP).");
             Assert.That(controller.RequestCall(1), Is.False, "One call at a time.");
             yield return Capture("20-reserve-call.png");
             controller.RequestEndTurn();

@@ -106,6 +106,18 @@ namespace ShardsOfTheLimit.Presentation
         {
             PresentTimelineResults(turns.LastTimelineResults);
             RefreshCloudViews();
+            if (HasDueSwaps)
+            {
+                // Called replacements arrive first; they may even take over this very turn.
+                StartCoroutine(ResolveDueSwaps(unit));
+                return;
+            }
+
+            ContinueTurn(unit);
+        }
+
+        private void ContinueTurn(CombatUnit unit)
+        {
             if (EvaluateBattleEnd()) return;
             if (unit == null) return;
             MeasureActivationStart(unit);

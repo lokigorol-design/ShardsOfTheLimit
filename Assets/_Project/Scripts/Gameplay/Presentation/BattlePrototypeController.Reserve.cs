@@ -8,21 +8,17 @@ using UnityEngine;
 namespace ShardsOfTheLimit.Presentation
 {
     /// <summary>
-    /// Reserve and swap without an Archon unit: on any player turn the active resonant may, for 1 AP and the shared
-    /// Concentration, summon a reserve resonant next to itself, swap itself for one (the newcomer takes over the
-    /// remaining AP of this turn) or recall another resonant. Each resonant has an entry and a recall effect.
+    /// Calling a replacement (author's rule, 18.10.2026): on its turn any own resonant spends 1 AP to call a resonant
+    /// from the reserve. For 200 ticks the caller takes +100% damage and keeps acting; then the newcomer appears in its
+    /// place and the caller goes to the reserve. A fallen caller is not replaced. Entry and recall effects per resonant.
     /// </summary>
     public sealed partial class BattlePrototypeController
     {
         private readonly List<ReserveSlot> reserve = new List<ReserveSlot>();
-        private long concentrationReadyTick;
-        private int selectedReserveIndex = -1;
+        private readonly List<PendingSwap> pendingSwaps = new List<PendingSwap>();
 
         public IReadOnlyList<ReserveSlot> Reserve => reserve;
-        public long ConcentrationReadyTick => concentrationReadyTick;
-        public bool ConcentrationReady => turns != null && turns.CurrentTick >= concentrationReadyTick;
-
-        private IEnumerable<CombatUnit> FieldEcho => units.Where(unit => unit.Team == Team.Player && !unit.IsDefeated);
+        public IReadOnlyList<PendingSwap> PendingSwaps => pendingSwaps;
 
         private void SpawnReserve()
         {
@@ -37,124 +33,103 @@ namespace ShardsOfTheLimit.Presentation
             }
         }
 
-        private CombatUnit Commander => turns?.CurrentUnit;
+        public bool IsCalling(CombatUnit unit) => pendingSwaps.Any(swap => swap.Caller == unit);
 
-        private bool CanCommand(out string reason)
+        /// <summary>Why the active resonant cannot call now, or null.</summary>
+        private string CallBlockReason(CombatUnit active)
         {
-            reason = null;
-            CombatUnit active = Commander;
-            if (active == null || active.ControlType != ControlType.Player || isBusy || battleEnded) reason = "Сейчас не ход игрока.";
-            else if (active.CurrentActionPoints < ReserveRules.ActionCost) reason = "Не осталось ОД.";
-            else if (active.Channel != null) reason = "Пока поддерживается способность, смена недоступна.";
-            else if (!ConcentrationReady) reason = $"Концентрация восстановится на тике {concentrationReadyTick}.";
-            return reason == null;
+            if (active == null || active.ControlType != ControlType.Player || isBusy || battleEnded) return "Сейчас не ход игрока.";
+            if (active.CurrentActionPoints < ReserveRules.ActionCost) return "Не осталось ОД.";
+            if (active.Channel != null) return "Пока поддерживается способность, вызов недоступен.";
+            if (IsCalling(active)) return $"{active.DisplayName} уже ждёт замену.";
+            return null;
         }
 
-        /// <summary>Summon mode: free cells within 2 of the active resonant (if fewer than 3 on the field) or its own cell (swap).</summary>
-        public bool BeginSummon(int reserveIndex)
+        /// <summary>The active resonant calls reserve resonant <paramref name="reserveIndex"/> to take its place in 200 ticks.</summary>
+        public bool RequestCall(int reserveIndex)
         {
-            if (!CanCommand(out string reason))
+            CombatUnit caller = turns?.CurrentUnit;
+            string reason = CallBlockReason(caller);
+            if (reason == null && (reserveIndex < 0 || reserveIndex >= reserve.Count || !reserve[reserveIndex].IsAvailable(turns.CurrentTick)))
+                reason = "Этот резонант сейчас не может выйти.";
+            if (reason != null)
             {
                 status = reason;
                 return false;
             }
 
-            if (reserveIndex < 0 || reserveIndex >= reserve.Count || !reserve[reserveIndex].IsAvailable(turns.CurrentTick))
-            {
-                status = "Этот резонант ещё не готов вернуться.";
-                return false;
-            }
-
-            selectedReserveIndex = reserveIndex;
-            var cells = new List<GridCoordinate> { Commander.Cell };
-            if (FieldEcho.Count() < ReserveRules.FieldLimit)
-                cells.AddRange(ReserveRules.SummonCells(grid, Commander.Cell, IsOccupied));
-            EnterReserveMode(InteractionMode.Summon, cells);
-            status = $"{reserve[reserveIndex].Unit.DisplayName}: клетка активного резонанта — замена (сменщик получает " +
-                     "оставшиеся ОД), свободная клетка рядом — призыв (на поле не больше 3).";
-            return true;
-        }
-
-        /// <summary>Recall mode: another own resonant on the field returns to the reserve.</summary>
-        public bool BeginRecall()
-        {
-            if (!CanCommand(out string reason))
-            {
-                status = reason;
-                return false;
-            }
-
-            selectedReserveIndex = -1;
-            EnterReserveMode(InteractionMode.Recall,
-                FieldEcho.Where(unit => unit != Commander).Select(unit => unit.Cell).ToArray());
-            status = "Отзыв: выбери другого своего резонанта. Отзыв снимает с него отрицательные эффекты.";
-            return true;
-        }
-
-        private void EnterReserveMode(InteractionMode reserveMode, IReadOnlyCollection<GridCoordinate> cells)
-        {
-            mode = reserveMode;
-            selectedDestination = null;
-            selectedPath = System.Array.Empty<GridCoordinate>();
-            selectedAbilityTarget = null;
-            abilityPreview = null;
-            previewImpact = System.Array.Empty<GridCoordinate>();
-            targetable = cells;
-            targetingRange = reserveMode == InteractionMode.Summon
-                ? ReserveRules.SummonCells(grid, Commander.Cell, _ => false)
-                : cells;
-            RefreshHighlights();
-        }
-
-        private bool IsReserveMode => mode == InteractionMode.Summon || mode == InteractionMode.Recall;
-
-        /// <summary>Click in summon or recall mode.</summary>
-        public bool RequestReserveAction(GridCoordinate cell)
-        {
-            if (!IsReserveMode || !targetable.Contains(cell)) return false;
-            CombatUnit echo = FieldEcho.FirstOrDefault(unit => unit.Cell == cell);
-            if (mode == InteractionMode.Recall)
-            {
-                if (echo == null || echo == Commander) return false;
-                StartCoroutine(PerformReserveAction(echo, null, cell));
-                return true;
-            }
-
-            ReserveSlot slot = selectedReserveIndex >= 0 && selectedReserveIndex < reserve.Count ? reserve[selectedReserveIndex] : null;
-            if (slot == null || echo != null && echo != Commander) return false;
-            StartCoroutine(PerformReserveAction(echo, slot, cell));
-            return true;
-        }
-
-        private IEnumerator PerformReserveAction(CombatUnit recalled, ReserveSlot summoned, GridCoordinate cell)
-        {
-            CombatUnit commander = Commander;
-            if (!commander.SpendActionPoints(ReserveRules.ActionCost)) yield break;
-            isBusy = true;
+            caller.SpendActionPoints(ReserveRules.ActionCost);
+            ReserveSlot slot = reserve[reserveIndex];
+            slot.IsCalled = true;
+            var summoning = StatusCalculator.Apply(caller, ReserveRules.Summoning, 1, turns.CurrentTick, caller.Id);
+            caller.ApplyStatus(summoning);
+            pendingSwaps.Add(new PendingSwap(caller, slot, turns.CurrentTick + ReserveRules.SwapTicks));
             reserveActions++;
-            concentrationReadyTick = turns.CurrentTick + ReserveRules.ConcentrationTicks;
-            if (unitViews.TryGetValue(commander, out CombatUnitView commanderView))
-                AbilityVfx.StoneCommand(commanderView.transform.position);
-            bool swap = recalled == commander;
-            int remaining = commander.CurrentActionPoints;
-            if (swap) MeasureActivationEnd(commander);
-            if (recalled != null) yield return RecallEcho(recalled, swap ? summoned?.Unit : null);
-            if (summoned != null) yield return SummonEcho(summoned, cell, swap ? commander.Facing : commander.Facing, swap, remaining);
-            resolvedActions++;
-            isBusy = false;
-            ClearInteractionState();
-            selectedReserveIndex = -1;
-            if (EvaluateBattleEnd()) yield break;
-            CombatUnit active = turns.CurrentUnit;
-            SelectUnit(active);
-            RefreshNextEnemyIntent();
-            if (active.CurrentActionPoints == 0) StartCoroutine(EndTurnAfterDelay());
+            if (unitViews.TryGetValue(caller, out CombatUnitView view)) AbilityVfx.StoneCommand(view.transform.position);
+            feedback.AddLog($"{caller.DisplayName} вызывает {slot.Unit.DisplayName}: +100% урона до тика " +
+                            $"{turns.CurrentTick + ReserveRules.SwapTicks}, затем замена");
+            status = $"{slot.Unit.DisplayName} выйдет на место {caller.DisplayName} через {ReserveRules.SwapTicks} тиков. " +
+                     "До тех пор он получает двойной урон.";
+            RefreshMovementOptions(caller);
+            RefreshHighlights();
+            if (caller.CurrentActionPoints == 0) StartCoroutine(EndTurnAfterDelay());
+            return true;
         }
 
-        private IEnumerator RecallEcho(CombatUnit echo, CombatUnit successor)
+        private bool HasDueSwaps => pendingSwaps.Any(swap => swap.IsDue(turns.CurrentTick) || swap.Caller.IsDefeated);
+
+        /// <summary>Called replacements whose 200 ticks passed arrive; calls of fallen resonants are void.</summary>
+        private IEnumerator ResolveDueSwaps(CombatUnit nextUnit)
+        {
+            isBusy = true;
+            foreach (PendingSwap swap in pendingSwaps.Where(swap => swap.IsDue(turns.CurrentTick) || swap.Caller.IsDefeated).ToArray())
+            {
+                pendingSwaps.Remove(swap);
+                swap.Incoming.IsCalled = false;
+                if (swap.Caller.IsDefeated)
+                {
+                    feedback.AddLog($"{swap.Caller.DisplayName} пал: {swap.Incoming.Unit.DisplayName} не выйдет на его место");
+                    continue;
+                }
+
+                CombatUnit caller = swap.Caller;
+                GridCoordinate cell = caller.Cell;
+                bool takesTurn = caller == nextUnit;
+                yield return RecallEcho(caller);
+                CombatUnit newcomer = swap.Incoming.Unit;
+                reserve.Remove(swap.Incoming);
+                newcomer.MoveTo(cell);
+                newcomer.SetFacing(caller.Facing);
+                units.Add(newcomer);
+                if (takesTurn)
+                {
+                    // The caller's turn has come: the newcomer acts in its place right away.
+                    turns.ReplaceCurrent(caller, newcomer);
+                    newcomer.BeginActivation(ActionsPerTurn);
+                    nextUnit = newcomer;
+                }
+                else
+                {
+                    turns.RemoveUnit(caller);
+                    turns.AddUnit(newcomer, turns.CurrentTick + SpeedTimeline.GetInterval(newcomer.EffectiveSpeed));
+                }
+
+                reserve.Add(new ReserveSlot(caller, turns.CurrentTick + ReserveRules.ReturnLockTicks));
+                CombatUnitView view = CreateUnitView(newcomer);
+                feedback.AddLog($"Замена: {newcomer.DisplayName} выходит в {cell} вместо {caller.DisplayName}");
+                yield return AbilityVfx.SummonPortal(view.transform, EffectWorldPosition(cell));
+                yield return EntryEffect(newcomer, cell);
+                RefreshCloudViews();
+            }
+
+            isBusy = false;
+            ContinueTurn(nextUnit);
+        }
+
+        private IEnumerator RecallEcho(CombatUnit echo)
         {
             GridCoordinate cell = echo.Cell;
-            feedback.AddLog($"Отзыв: {echo.DisplayName} уходит в камень");
+            feedback.AddLog($"{echo.DisplayName} уходит в камень");
             if (unitViews.TryGetValue(echo, out CombatUnitView view))
             {
                 yield return AbilityVfx.RecallBeam(view.transform);
@@ -165,42 +140,10 @@ namespace ShardsOfTheLimit.Presentation
             yield return RecallEffect(echo, cell);
             int cleansed = echo.Cleanse();
             if (cleansed > 0) feedback.AddLog($"{echo.DisplayName}: отзыв снял отрицательных эффектов: {cleansed}");
+            echo.RemoveSummoning();
             echo.EndChannel();
             units.Remove(echo);
-            // The active resonant hands its turn to the one swapped in; anyone else simply leaves the timeline.
-            if (successor != null && echo == turns.CurrentUnit)
-            {
-                successor.MoveTo(cell);
-                turns.ReplaceCurrent(echo, successor);
-            }
-            else turns.RemoveUnit(echo);
-            reserve.Add(new ReserveSlot(echo, turns.CurrentTick + ReserveRules.ReturnLockTicks));
-            RefreshCloudViews();
         }
-
-        private IEnumerator SummonEcho(ReserveSlot slot, GridCoordinate cell, GridCoordinate facing, bool swap, int remainingActionPoints)
-        {
-            CombatUnit echo = slot.Unit;
-            reserve.Remove(slot);
-            echo.MoveTo(cell);
-            echo.SetFacing(facing);
-            units.Add(echo);
-            if (swap)
-            {
-                // The newcomer continues this turn with the AP that were left.
-                echo.BeginActivation(remainingActionPoints);
-                MeasureActivationStart(echo);
-            }
-            else turns.AddUnit(echo, turns.CurrentTick + SpeedTimeline.GetInterval(echo.EffectiveSpeed));
-
-            CombatUnitView view = CreateUnitView(echo);
-            feedback.AddLog(swap ? $"Замена: {echo.DisplayName} выходит в {cell} с {remainingActionPoints} ОД"
-                : $"Призыв: {echo.DisplayName} выходит в {cell}");
-            yield return AbilityVfx.SummonPortal(view.transform, EffectWorldPosition(cell));
-            yield return EntryEffect(echo, cell);
-            RefreshCloudViews();
-        }
-
         /// <summary>Entry effects (analysis 4, drafts per resonant). Friendly fire applies.</summary>
         private IEnumerator EntryEffect(CombatUnit echo, GridCoordinate cell)
         {

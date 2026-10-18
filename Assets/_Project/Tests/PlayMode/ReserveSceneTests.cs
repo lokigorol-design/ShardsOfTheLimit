@@ -11,11 +11,11 @@ using UnityEngine.TestTools;
 
 namespace ShardsOfTheLimit.Tests
 {
-    /// <summary>Main battle without an Archon: the idol swaps itself for a reserve resonant, later the toad is recalled.</summary>
+    /// <summary>Main battle without an Archon: the idol calls a reserve resonant that arrives 200 ticks later; a fallen caller is not replaced.</summary>
     public sealed class ReserveSceneTests
     {
         [UnityTest]
-        public IEnumerator ActiveResonantSwapsAndRecallsWithEntryAndRecallEffects()
+        public IEnumerator CallingAReplacementTakesTwoHundredTicksAndFailsIfTheCallerFalls()
         {
             BattlePrototypeController.SetBranchVariant("blaze-worm", 0);
             BattlePrototypeController.SetBranchVariant("blightgullet", 0);
@@ -34,35 +34,34 @@ namespace ShardsOfTheLimit.Tests
             CombatUnit idol = controller.ActiveUnit;
             GridCoordinate idolCell = idol.Cell;
             CombatUnit incoming = controller.Reserve[0].Unit;
-            Assert.That(controller.BeginSummon(0), Is.True);
-            yield return Capture("20-reserve-summon-targets.png");
-            Assert.That(controller.RequestReserveAction(idolCell), Is.True, "The active resonant's own cell swaps it out.");
-            yield return new WaitForSeconds(0.45f);
-            yield return Capture("21-reserve-swap.png");
-            yield return new WaitForSeconds(1.4f);
-            Assert.That(controller.Units, Has.No.Member(idol));
-            Assert.That(controller.ActiveUnit, Is.SameAs(incoming), "The newcomer continues the turn.");
-            Assert.That(incoming.Cell, Is.EqualTo(idolCell));
-            Assert.That(incoming.CurrentActionPoints, Is.EqualTo(1), "It keeps the AP that were left.");
-            Assert.That(controller.AreaEffects.TrapAt(idolCell), Is.Not.Null, "The idol leaves a Lift Trap.");
-            Assert.That(controller.Reserve.Single(slot => slot.Unit == idol).AvailableTick,
-                Is.EqualTo(controller.CurrentTimelineTick + ReserveRules.ReturnLockTicks));
-            Assert.That(controller.BeginRecall(), Is.False, "Concentration is spent.");
+            Assert.That(controller.RequestCall(0), Is.True);
+            Assert.That(idol.IsSummoning, Is.True, "The caller is vulnerable while it waits.");
+            Assert.That(idol.CurrentActionPoints, Is.EqualTo(1), "The call costs 1 AP; the idol keeps acting.");
+            Assert.That(controller.RequestCall(1), Is.False, "One call at a time.");
+            yield return Capture("20-reserve-call.png");
             controller.RequestEndTurn();
             controller.RequestEndTurn();
 
-            yield return PassTurnsUntil(controller, unit => unit.Team == Team.Player && controller.ConcentrationReady &&
-                                                            controller.Units.Any(other => other.DefinitionId == "blightgullet" && other != unit));
-            CombatUnit toad = controller.Units.Single(unit => unit.DefinitionId == "blightgullet");
-            GridCoordinate toadCell = toad.Cell;
-            Assert.That(controller.BeginRecall(), Is.True);
-            Assert.That(controller.RequestReserveAction(toadCell), Is.True);
-            yield return new WaitForSeconds(0.3f);
-            yield return Capture("22-reserve-recall.png");
-            yield return new WaitForSeconds(1f);
-            Assert.That(controller.Units, Has.No.Member(toad));
-            Assert.That(controller.AreaEffects.Clouds.Count, Is.GreaterThan(0), "The toad leaves an Oil cloud.");
-            LogAssert.NoUnexpectedReceived();
+            // 200 ticks later the panther appears where the idol stood.
+            yield return PassTurnsUntil(controller, unit => controller.Units.Contains(incoming) && unit.ControlType == ControlType.Player);
+            yield return Capture("21-reserve-arrival.png");
+            Assert.That(controller.Units, Has.No.Member(idol));
+            Assert.That(incoming.Cell, Is.EqualTo(idolCell));
+            Assert.That(controller.AreaEffects.TrapAt(idolCell), Is.Not.Null, "The idol leaves a Lift Trap under the newcomer.");
+            Assert.That(idol.IsSummoning, Is.False);
+            Assert.That(controller.Reserve.Any(slot => slot.Unit == idol), Is.True, "The idol went to the reserve.");
+
+            // A caller that falls before the arrival is not replaced.
+            yield return PassTurnsUntil(controller, unit => unit.DefinitionId == "blightgullet");
+            CombatUnit toad = controller.ActiveUnit;
+            CombatUnit ranger = controller.Reserve.Single(slot => slot.Unit.DefinitionId != "primal-idol").Unit;
+            Assert.That(controller.RequestCall(controller.Reserve.ToList().FindIndex(slot => slot.Unit == ranger)), Is.True);
+            CombatEffectResolver.Apply(new[] { CombatEffectCalculator.Damage(toad, toad.ResourceState, 100000) });
+            controller.RequestEndTurn();
+            controller.RequestEndTurn();
+            yield return PassTurnsUntil(controller, unit => unit.ControlType == ControlType.Player && controller.PendingSwaps.Count == 0);
+            Assert.That(controller.Units, Has.No.Member(ranger), "Nobody comes in place of a fallen resonant.");
+            Assert.That(controller.Reserve.Single(slot => slot.Unit == ranger).IsCalled, Is.False);            LogAssert.NoUnexpectedReceived();
         }
 
         private static IEnumerator PassTurnsUntil(BattlePrototypeController controller, System.Func<CombatUnit, bool> predicate)

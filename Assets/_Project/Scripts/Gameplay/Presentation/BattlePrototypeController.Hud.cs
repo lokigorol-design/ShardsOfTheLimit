@@ -276,7 +276,7 @@ namespace ShardsOfTheLimit.Presentation
             bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
             bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
             float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0) +
-                          (ShowsReserve(active) ? reserve.Count + 1 : 0);
+                          (ShowsReserve(active) ? reserve.Count : 0);
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
             if (panel.x < 324f) panel.x = 324f;
@@ -357,15 +357,11 @@ namespace ShardsOfTheLimit.Presentation
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
             else if (hoveredAbilityIndex == -4 && hoveredReserveIndex >= 0 && hoveredReserveIndex < reserve.Count)
-                DrawTextTooltip(panel, "Призыв или замена: " + reserve[hoveredReserveIndex].Unit.DisplayName,
-                    $"1 ОД и Концентрация (раз в {ReserveRules.ConcentrationTicks} тиков). Клетка активного резонанта — " +
-                    "замена: он уходит в камень, сменщик выходит туда же и продолжает ход с оставшимися ОД. Свободная клетка до " +
-                    $"{ReserveRules.SummonRange} — призыв, если на поле меньше {ReserveRules.FieldLimit} резонантов. " +
-                    $"Здоровье {reserve[hoveredReserveIndex].Unit.CurrentHealth}/{reserve[hoveredReserveIndex].Unit.MaximumHealth}." +
-                    (ConcentrationReady ? string.Empty : $"\nКонцентрация готова на тике {concentrationReadyTick}."));
-            else if (hoveredAbilityIndex == -5) DrawTextTooltip(panel, "Отзыв",
-                "1 ОД и Концентрация. Другой свой резонант уходит в камень: " +
-                "срабатывает его эффект отзыва, отрицательные эффекты снимаются. Вернуть его можно через 300 тиков.");
+                DrawTextTooltip(panel, "Вызов: " + reserve[hoveredReserveIndex].Unit.DisplayName,
+                    $"1 ОД. Активный резонант {ReserveRules.SwapTicks} тиков получает +100% урона и продолжает действовать, " +
+                    "затем уходит в камень (эффект отзыва, отрицательные эффекты снимаются), а вызванный выходит на его место " +
+                    "(эффект входа). Если активный падёт раньше, замены не будет. " +
+                    $"Здоровье {reserve[hoveredReserveIndex].Unit.CurrentHealth}/{reserve[hoveredReserveIndex].Unit.MaximumHealth}.");
             else if (hoveredAbilityIndex == -3) DrawTextTooltip(panel, "Ритуальные поверхности",
                 "Способности «Поверхность» применяются к полу или к стене. Стена — столб на 2+ единицы выше соседней клетки " +
                 "или препятствие, обращённое к тотему; эффект выходит из неё перпендикулярно в клетку перед ней.");
@@ -378,30 +374,28 @@ namespace ShardsOfTheLimit.Presentation
         private bool ShowsReserve(CombatUnit active) => active != null && active.Team == Team.Player &&
                                                         active.ControlType == ControlType.Player && reserve.Count > 0;
 
-        /// <summary>Reserve on every player turn: one button per reserve resonant (summon or swap) and a recall button.</summary>
+        /// <summary>Reserve on every player turn: one button per reserve resonant to call it in place of the active one.</summary>
         private float DrawReserveButtons(CombatUnit active, float x, float y, bool canAct)
         {
-            bool ready = ConcentrationReady && active.CurrentActionPoints >= ReserveRules.ActionCost && active.Channel == null;
+            bool ready = CallBlockReason(active) == null;
             for (int index = 0; index < reserve.Count; index++)
             {
                 ReserveSlot slot = reserve[index];
                 var rect = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
                 bool available = canAct && ready && slot.IsAvailable(turns.CurrentTick);
-                bool selected = mode == InteractionMode.Summon && selectedReserveIndex == index;
+                bool selected = slot.IsCalled;
                 Fill(new Rect(rect.x - 2f, rect.y - 2f, rect.width + 4f, rect.height + 4f),
                     selected ? new Color(1f, 0.85f, 0.3f) : available ? new Color(0.55f, 0.48f, 0.35f) : new Color(0.2f, 0.2f, 0.22f));
                 GUI.enabled = available;
                 Sprite portrait = definitionsByUnit.TryGetValue(slot.Unit, out UnitDefinition reserveDefinition) ? reserveDefinition.Portrait : null;
-                if (GUI.Button(rect, portrait != null ? GUIContent.none : new GUIContent("ПРИЗЫВ\n" + slot.Unit.DisplayName), hudButtonStyle))
-                {
-                    if (selected) SelectUnit(active);
-                    else BeginSummon(index);
-                }
+                if (GUI.Button(rect, portrait != null ? GUIContent.none : new GUIContent("ВЫЗОВ\n" + slot.Unit.DisplayName), hudButtonStyle))
+                    RequestCall(index);
 
                 GUI.enabled = true;
                 if (portrait != null) Icon(new Rect(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f), portrait);
                 if (!available) Fill(rect, new Color(0f, 0f, 0f, 0.55f));
                 if (slot.Unit.IsDefeated) GUI.Label(rect, "ПАЛ", hudTitleStyle.Center());
+                else if (slot.IsCalled) GUI.Label(rect, "ИДЁТ", hudTitleStyle.Center());
                 else if (!slot.IsAvailable(turns.CurrentTick)) GUI.Label(rect, $"{slot.AvailableTick}т", hudTitleStyle.Center());
                 Bar(new Rect(rect.x + 3f, rect.yMax - 8f, rect.width - 6f, 5f),
                     slot.Unit.CurrentHealth / (float)slot.Unit.MaximumHealth, HealthColor);
@@ -416,20 +410,7 @@ namespace ShardsOfTheLimit.Presentation
                 x += AbilityButtonSize + 8f;
             }
 
-            var recall = new Rect(x, y, AbilityButtonSize, AbilityButtonSize);
-            bool recallSelected = mode == InteractionMode.Recall;
-            GUI.enabled = canAct && ready;
-            Fill(new Rect(recall.x - 2f, recall.y - 2f, recall.width + 4f, recall.height + 4f),
-                recallSelected ? new Color(1f, 0.85f, 0.3f) : new Color(0.3f, 0.3f, 0.36f));
-            if (GUI.Button(recall, "ОТЗЫВ\n(C)", hudButtonStyle))
-            {
-                if (recallSelected) SelectUnit(active);
-                else BeginRecall();
-            }
-
-            GUI.enabled = true;
-            if (recall.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -5;
-            return x + AbilityButtonSize + 8f;
+            return x;
         }
 
         private int hoveredReserveIndex = -1;
@@ -545,17 +526,11 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetMouseButtonUp(1) && (mouse - rightPressPosition).sqrMagnitude < 36f && canAct)
             {
                 if (mode == InteractionMode.AbilityTargeting) CancelAbility();
-                else if (IsReserveMode) SelectUnit(selectedUnit);
                 else ClearMovementPreview();
             }
 
             if (!canAct || overHud || !Input.GetMouseButtonDown(0) || !hoveredCell.HasValue) return;
             GridCoordinate target = hoveredCell.Value;
-            if (IsReserveMode)
-            {
-                if (!RequestReserveAction(target)) status = "Эта клетка вне зелёной зоны.";
-                return;
-            }
 
             if (mode == InteractionMode.AbilityTargeting)
             {
@@ -611,7 +586,6 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             GridCoordinate cell = hoveredCell.Value;
-            if (IsReserveMode) return;
             if (mode == InteractionMode.AbilityTargeting)
             {
                 if (targetable.Contains(cell) && selectedAbilityTarget != cell) HandleCellChoice(cell);

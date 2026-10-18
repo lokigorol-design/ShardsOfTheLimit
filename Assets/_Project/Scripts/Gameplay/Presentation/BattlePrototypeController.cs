@@ -18,11 +18,7 @@ namespace ShardsOfTheLimit.Presentation
             Movement,
             AbilityTargeting,
             /// <summary>End-of-turn step: the player chooses where the resonant faces.</summary>
-            Facing,
-            /// <summary>Reserve: choose where a reserve resonant appears (or swap with the active one).</summary>
-            Summon,
-            /// <summary>Reserve: choose which resonant returns to the stone.</summary>
-            Recall
+            Facing
         }
 
         private sealed class AiAbilityPlan
@@ -229,10 +225,9 @@ namespace ShardsOfTheLimit.Presentation
                 return;
             }
 
-            // Reserve on every player turn: Z and X — summon or swap the first/second reserve resonant, C — recall.
-            if (Input.GetKeyDown(KeyCode.Z)) BeginSummon(0);
-            if (Input.GetKeyDown(KeyCode.X)) BeginSummon(1);
-            if (Input.GetKeyDown(KeyCode.C)) BeginRecall();
+            // Reserve on every player turn: Z and X call the first/second reserve resonant in place of the active one.
+            if (Input.GetKeyDown(KeyCode.Z)) RequestCall(0);
+            if (Input.GetKeyDown(KeyCode.X)) RequestCall(1);
 
             for (int index = 0; index < 6; index++)
             {
@@ -247,7 +242,6 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 if (mode == InteractionMode.Facing) CancelFacing();
-                else if (IsReserveMode) SelectUnit(selectedUnit);
                 else CancelAbility();
             }
 
@@ -731,9 +725,8 @@ namespace ShardsOfTheLimit.Presentation
 
         private bool EvaluateBattleEnd()
         {
-            // The battle is lost when every resonant, on the field and in the reserve, has fallen.
-            outcome = BattleReadabilityRules.EvaluateOutcome(units
-                .Concat(reserve.Select(slot => slot.Unit)));
+            // The battle is lost when no own resonant is left on the field: nobody can call the reserve any more.
+            outcome = BattleReadabilityRules.EvaluateOutcome(units);
             if (outcome == BattleOutcome.Ongoing) return false;
 
             battleEnded = true;

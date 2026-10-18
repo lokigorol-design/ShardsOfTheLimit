@@ -4,7 +4,7 @@ using ShardsOfTheLimit.Domain;
 
 namespace ShardsOfTheLimit.Tests
 {
-    /// <summary>Reserve and swap without an Archon: summon cells, return lock and the timeline handing a turn over.</summary>
+    /// <summary>Calling a replacement: the caller's double damage, the 200-tick wait, the return lock and turn hand-over.</summary>
     public sealed class ReserveTests
     {
         private static GridCoordinate C(int x, int y) => new GridCoordinate(x, y);
@@ -13,17 +13,28 @@ namespace ShardsOfTheLimit.Tests
             new CombatUnit(name, name, 100, 0, speed, 3, Team.Player, ControlType.Player, cell);
 
         [Test]
-        public void SummonCellsAreFreeWalkableCellsWithinTwoOfTheActiveResonant()
+        public void CallerTakesDoubleDamageUntilTheReplacementArrives()
         {
-            var grid = new TacticalGrid(Enumerable.Range(0, 6).SelectMany(x =>
-                Enumerable.Range(0, 6).Select(y => new GridCell(C(x, y), 0, !(x == 3 && y == 2)))));
-            var cells = ReserveRules.SummonCells(grid, C(2, 2), cell => cell == C(2, 3));
-            Assert.That(cells, Has.No.Member(C(2, 2)), "Not the resonant's own cell.");
-            Assert.That(cells, Has.No.Member(C(2, 3)), "Occupied.");
-            Assert.That(cells, Has.No.Member(C(3, 2)), "Obstacle.");
-            Assert.That(cells, Has.Member(C(4, 2)));
-            Assert.That(cells, Has.No.Member(C(4, 3)), "Three cells away.");
-            Assert.That(cells.Count, Is.EqualTo(10), "12 cells within 2, minus the occupied one and the obstacle.");
+            CombatUnit caller = Unit("caller", C(0, 0));
+            Assert.That(CombatEffectCalculator.Damage(caller, caller.ResourceState, 10).HealthDamage, Is.EqualTo(10));
+            caller.ApplyStatus(StatusCalculator.Apply(caller, ReserveRules.Summoning, 1, 100, caller.Id));
+            Assert.That(caller.IsSummoning, Is.True);
+            Assert.That(CombatEffectCalculator.Damage(caller, caller.ResourceState, 10).HealthDamage, Is.EqualTo(20), "+100%.");
+            Assert.That(CombatEffectCalculator.PeriodicDamage(caller, caller.ResourceState, 5, "BURNING").HealthDamage, Is.EqualTo(10));
+            Assert.That(caller.Cleanse(), Is.Zero, "The call is not a negative effect: cleansing does not cancel it.");
+            caller.ExpireStatuses(100 + ReserveRules.SwapTicks);
+            Assert.That(caller.IsSummoning, Is.False, "It lasts 200 ticks.");
+        }
+
+        [Test]
+        public void PendingSwapIsDueAfterTwoHundredTicksAndHoldsItsReserveSlot()
+        {
+            var slot = new ReserveSlot(Unit("panther", C(0, 0)), 0);
+            var swap = new PendingSwap(Unit("toad", C(1, 1)), slot, 100 + ReserveRules.SwapTicks);
+            slot.IsCalled = true;
+            Assert.That(slot.IsAvailable(150), Is.False, "Already on its way.");
+            Assert.That(swap.IsDue(299), Is.False);
+            Assert.That(swap.IsDue(300), Is.True);
         }
 
         [Test]

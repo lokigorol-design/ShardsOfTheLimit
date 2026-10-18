@@ -263,6 +263,9 @@ namespace ShardsOfTheLimit.Presentation
             magmaMarkBudget += Time.deltaTime * 10f;
             if (magmaMarkBudget < 1f) return;
             magmaMarkBudget -= 1f;
+            foreach (CombatUnit caller in units.Where(unit => !unit.IsDefeated && unit.IsSummoning))
+                if (unitViews.TryGetValue(caller, out CombatUnitView callerView))
+                    AbilityVfx.SummoningMark(callerView.transform.position);
             foreach (CombatUnit hidden in units.Where(unit => !unit.IsDefeated && unit.IsHiddenFromEnemies))
                 if (unitViews.TryGetValue(hidden, out CombatUnitView hiddenView))
                     AbilityVfx.StealthMark(hiddenView.transform.position, hidden.IsInMist);

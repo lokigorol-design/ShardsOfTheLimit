@@ -549,6 +549,8 @@ namespace ShardsOfTheLimit.Domain
             double afterDefense = DefenseFormula.Apply(amount, target.EffectiveDefense);
             if (afterDefense > 0 && target.GetMechanicStacks(StatusMechanic.Vulnerability) > 0)
                 afterDefense *= StatusMechanicRules.VulnerabilityMultiplier;
+            if (afterDefense > 0 && target.GetMechanicStacks(StatusMechanic.Summoning) > 0)
+                afterDefense *= ReserveRules.SummoningDamageMultiplier;
             return Absorb(target, state, afterDefense <= 0 ? 0 : Math.Max(1, DefenseFormula.Round(afterDefense)));
         }
 
@@ -558,6 +560,7 @@ namespace ShardsOfTheLimit.Domain
             if (target == null) throw new ArgumentNullException(nameof(target));
             if (amount <= 0) return Absorb(target, state, 0);
             double scaled = amount * (100 - target.GetPeriodicResistance(sourceId)) / 100d;
+            if (target.GetMechanicStacks(StatusMechanic.Summoning) > 0) scaled *= ReserveRules.SummoningDamageMultiplier;
             return Absorb(target, state, scaled <= 0 ? 0 : Math.Max(1, DefenseFormula.Round(scaled)));
         }
 

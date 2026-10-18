@@ -103,7 +103,7 @@ namespace ShardsOfTheLimit.Presentation
                                 $"максимум {seconds.Last():0.0} с");
             }
 
-            text.AppendLine($"Действий всего: {resolvedActions}, призывов, замен и отзывов: {reserveActions}");
+            text.AppendLine($"Действий всего: {resolvedActions}, вызовов замены: {reserveActions}");
             text.AppendLine();
             text.AppendLine("Время хода по резонантам (игрок):");
             foreach (var group in player.GroupBy(r => r.Unit))

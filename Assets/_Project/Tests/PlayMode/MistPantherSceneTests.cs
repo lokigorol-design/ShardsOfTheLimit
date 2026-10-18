@@ -30,15 +30,16 @@ namespace ShardsOfTheLimit.Tests
             Call(controller, "CloseOnboarding");
             Assert.That(controller.Reserve[0].Unit.DefinitionId, Is.EqualTo("mist-panther"));
 
-            // On the toad's turn the toad swaps itself for the panther, which continues the turn with 1 AP.
+            // On its turn the toad calls the panther; 200 ticks later the panther takes its place.
             yield return PassTurnsUntil(controller, unit => unit.DefinitionId == "blightgullet");
             CombatUnit toad = controller.ActiveUnit;
             CombatUnit panther = controller.Reserve[0].Unit;
-            Assert.That(controller.BeginSummon(0), Is.True);
-            Assert.That(controller.RequestReserveAction(toad.Cell), Is.True);
-            yield return new WaitForSeconds(1.6f);
+            Assert.That(controller.RequestCall(0), Is.True);
+            controller.RequestEndTurn();
+            controller.RequestEndTurn();
+            yield return PassTurnsUntil(controller, unit => unit == panther);
             Assert.That(controller.Units, Has.Member(panther));
-            Assert.That(controller.ActiveUnit, Is.SameAs(panther));
+            Assert.That(controller.Units, Has.No.Member(toad));
             Assert.That(panther.IsInMist, Is.True, "The panther arrives in Mist.");
             yield return Capture("30-panther-arrives-in-mist.png");
             Assert.That(controller.BranchVariantName(panther), Is.EqualTo("Mist Panther · Deep Wounds"));

@@ -26,7 +26,9 @@ namespace ShardsOfTheLimit.Domain
         /// <summary>Mist: nobody can target the unit and no effect touches it. Ends after 2 turns or at its first attack.</summary>
         Mist,
         /// <summary>Every time the bearer spends AP it takes 0,15 × ATK of the source per stack (periodic, BLEED).</summary>
-        Bleed
+        Bleed,
+        /// <summary>Calling a replacement from the reserve: incoming damage +100% until the newcomer arrives. Not cleansable.</summary>
+        Summoning
     }
 
     public static class StatusMechanicRules

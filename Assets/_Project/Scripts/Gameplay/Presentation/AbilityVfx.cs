@@ -487,6 +487,15 @@ namespace ShardsOfTheLimit.Presentation
                 vfx.Emit(position + Random.insideUnitSphere * 0.4f, ParticleSpec.Sparks(new Color(0.6f, 0.7f, 1f, 0.6f), 0.2f, 0.04f));
         }
 
+        /// <summary>A resonant calling its replacement: a golden ring of stone light rises around it (it is vulnerable).</summary>
+        public static void SummoningMark(Vector3 position)
+        {
+            float angle = Time.time * 3f + Random.value * Mathf.PI * 2f;
+            ParticleSpec mote = ParticleSpec.Sparks(StoneLight, 0.3f, 0.06f);
+            mote.Velocity = Vector3.up * 0.9f;
+            VfxSystem.Instance.Emit(position + new Vector3(Mathf.Cos(angle) * 0.45f, -0.5f, Mathf.Sin(angle) * 0.45f), mote);
+        }
+
         /// <summary>Short fire flare on one cell (worm entry).</summary>
         public static void FireBurstAt(Vector3 position) => FireImpact(position, 0.5f);
 

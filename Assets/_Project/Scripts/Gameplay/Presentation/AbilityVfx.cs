@@ -411,8 +411,8 @@ namespace ShardsOfTheLimit.Presentation
 
         private static readonly Color StoneLight = new Color(1f, 0.85f, 0.45f, 1f);
 
-        /// <summary>The Archon raises the resonance stone: a short golden flare.</summary>
-        public static void ArchonCommand(Vector3 position)
+        /// <summary>The resonance stone answers a summon or recall: a short golden flare at the active resonant.</summary>
+        public static void StoneCommand(Vector3 position)
         {
             VfxSystem vfx = VfxSystem.Instance;
             vfx.Burst(position + Vector3.up * 0.7f, 18, ParticleSpec.Sparks(StoneLight, 1.8f, 0.07f));

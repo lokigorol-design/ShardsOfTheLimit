@@ -19,9 +19,9 @@ namespace ShardsOfTheLimit.Presentation
             AbilityTargeting,
             /// <summary>End-of-turn step: the player chooses where the resonant faces.</summary>
             Facing,
-            /// <summary>Archon: choose where a reserve resonant appears (or whom it replaces).</summary>
+            /// <summary>Reserve: choose where a reserve resonant appears (or swap with the active one).</summary>
             Summon,
-            /// <summary>Archon: choose which resonant returns to the stone.</summary>
+            /// <summary>Reserve: choose which resonant returns to the stone.</summary>
             Recall
         }
 
@@ -229,16 +229,13 @@ namespace ShardsOfTheLimit.Presentation
                 return;
             }
 
+            // Reserve on every player turn: Z and X — summon or swap the first/second reserve resonant, C — recall.
+            if (Input.GetKeyDown(KeyCode.Z)) BeginSummon(0);
+            if (Input.GetKeyDown(KeyCode.X)) BeginSummon(1);
+            if (Input.GetKeyDown(KeyCode.C)) BeginRecall();
+
             for (int index = 0; index < 6; index++)
             {
-                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + index)) && IsArchon(turns.CurrentUnit))
-                {
-                    // Archon: 1..N summon from the reserve, N+1 recalls.
-                    if (index < reserve.Count) BeginSummon(index);
-                    else if (index == reserve.Count) BeginRecall();
-                    continue;
-                }
-
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + index)))
                 {
                     // Pressing the selected ability's key again returns to movement.
@@ -250,7 +247,7 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 if (mode == InteractionMode.Facing) CancelFacing();
-                else if (IsArchonMode) SelectUnit(selectedUnit);
+                else if (IsReserveMode) SelectUnit(selectedUnit);
                 else CancelAbility();
             }
 
@@ -343,7 +340,7 @@ namespace ShardsOfTheLimit.Presentation
             SpawnUnit(opponentDefinitions[0], Team.Opponent, ControlType.BasicAI, blightgulletShowcase ? new GridCoordinate(4, 0) : new GridCoordinate(7, 7), new Color(0.95f, 0.2f, 0.18f));
             SpawnUnit(opponentDefinitions[1], Team.Opponent, ControlType.BasicAI, new GridCoordinate(7, 3), new Color(1f, 0.52f, 0.12f));
             SpawnUnit(opponentDefinitions[1], Team.Opponent, ControlType.BasicAI, new GridCoordinate(5, 6), new Color(0.95f, 0.72f, 0.12f));
-            if (!blightgulletShowcase) SpawnArchonAndReserve();
+            if (!blightgulletShowcase) SpawnReserve();
         }
 
         private CombatUnit SpawnUnit(
@@ -734,8 +731,8 @@ namespace ShardsOfTheLimit.Presentation
 
         private bool EvaluateBattleEnd()
         {
-            // The Archon does not count: the battle is lost when every resonant (field and reserve) has fallen.
-            outcome = BattleReadabilityRules.EvaluateOutcome(units.Where(unit => unit != archon)
+            // The battle is lost when every resonant, on the field and in the reserve, has fallen.
+            outcome = BattleReadabilityRules.EvaluateOutcome(units
                 .Concat(reserve.Select(slot => slot.Unit)));
             if (outcome == BattleOutcome.Ongoing) return false;
 

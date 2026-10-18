@@ -276,7 +276,7 @@ namespace ShardsOfTheLimit.Presentation
             bool facingStep = mode == InteractionMode.Facing && active.ControlType == ControlType.Player;
             bool canAct = !showOnboarding && !battleEnded && !isBusy && active.ControlType == ControlType.Player && !facingStep;
             float count = abilities.Count + 1 + (abilities.Any(AbilityRuntime.IsSurfaceAbility) ? 1 : 0) +
-                          (IsArchon(active) ? reserve.Count + 1 : 0);
+                          (ShowsReserve(active) ? reserve.Count + 1 : 0);
             float width = count * (AbilityButtonSize + 8f) + 150f;
             var panel = new Rect((Screen.width - width) * 0.5f, Screen.height - AbilityButtonSize - 46f, width, AbilityButtonSize + 34f);
             if (panel.x < 324f) panel.x = 324f;
@@ -300,7 +300,7 @@ namespace ShardsOfTheLimit.Presentation
             if (moveRect.Contains(Event.current.mousePosition)) hoveredAbilityIndex = -2;
             x += AbilityButtonSize + 8f;
 
-            if (IsArchon(active)) x = DrawArchonButtons(active, x, y, canAct);
+            if (ShowsReserve(active)) x = DrawReserveButtons(active, x, y, canAct);
 
             for (int index = 0; index < abilities.Count; index++)
             {
@@ -357,14 +357,14 @@ namespace ShardsOfTheLimit.Presentation
 
             if (hoveredAbilityIndex >= 0) DrawAbilityTooltip(abilities[hoveredAbilityIndex], active, panel);
             else if (hoveredAbilityIndex == -4 && hoveredReserveIndex >= 0 && hoveredReserveIndex < reserve.Count)
-                DrawTextTooltip(panel, "Призыв: " + reserve[hoveredReserveIndex].Unit.DisplayName,
-                    $"1 ОД и Концентрация (раз в {ArchonRules.ConcentrationTicks} тиков). В свободную клетку до " +
-                    $"{ArchonRules.SummonRange} от Архонта, если на поле меньше {ArchonRules.FieldLimit} резонантов, " +
-                    $"или на место своего резонанта в радиусе связи {ArchonRules.LinkRadius} (замена). " +
+                DrawTextTooltip(panel, "Призыв или замена: " + reserve[hoveredReserveIndex].Unit.DisplayName,
+                    $"1 ОД и Концентрация (раз в {ReserveRules.ConcentrationTicks} тиков). Клетка активного резонанта — " +
+                    "замена: он уходит в камень, сменщик выходит туда же и продолжает ход с оставшимися ОД. Свободная клетка до " +
+                    $"{ReserveRules.SummonRange} — призыв, если на поле меньше {ReserveRules.FieldLimit} резонантов. " +
                     $"Здоровье {reserve[hoveredReserveIndex].Unit.CurrentHealth}/{reserve[hoveredReserveIndex].Unit.MaximumHealth}." +
                     (ConcentrationReady ? string.Empty : $"\nКонцентрация готова на тике {concentrationReadyTick}."));
             else if (hoveredAbilityIndex == -5) DrawTextTooltip(panel, "Отзыв",
-                $"1 ОД и Концентрация. Свой резонант в радиусе связи {ArchonRules.LinkRadius} уходит в камень: " +
+                "1 ОД и Концентрация. Другой свой резонант уходит в камень: " +
                 "срабатывает его эффект отзыва, отрицательные эффекты снимаются. Вернуть его можно через 300 тиков.");
             else if (hoveredAbilityIndex == -3) DrawTextTooltip(panel, "Ритуальные поверхности",
                 "Способности «Поверхность» применяются к полу или к стене. Стена — столб на 2+ единицы выше соседней клетки " +
@@ -375,10 +375,13 @@ namespace ShardsOfTheLimit.Presentation
                     : $"Шаг по клеткам: {MovementBudget(active)} очков передвижения за 1 ОД. Подъём стоит дороже.");
         }
 
-        /// <summary>Archon bar: one button per reserve resonant (summon or swap) and a recall button.</summary>
-        private float DrawArchonButtons(CombatUnit active, float x, float y, bool canAct)
+        private bool ShowsReserve(CombatUnit active) => active != null && active.Team == Team.Player &&
+                                                        active.ControlType == ControlType.Player && reserve.Count > 0;
+
+        /// <summary>Reserve on every player turn: one button per reserve resonant (summon or swap) and a recall button.</summary>
+        private float DrawReserveButtons(CombatUnit active, float x, float y, bool canAct)
         {
-            bool ready = ConcentrationReady && active.CurrentActionPoints >= ArchonRules.ActionCost;
+            bool ready = ConcentrationReady && active.CurrentActionPoints >= ReserveRules.ActionCost && active.Channel == null;
             for (int index = 0; index < reserve.Count; index++)
             {
                 ReserveSlot slot = reserve[index];
@@ -403,7 +406,7 @@ namespace ShardsOfTheLimit.Presentation
                 Bar(new Rect(rect.x + 3f, rect.yMax - 8f, rect.width - 6f, 5f),
                     slot.Unit.CurrentHealth / (float)slot.Unit.MaximumHealth, HealthColor);
                 Fill(new Rect(rect.x, rect.y, 18f, 18f), new Color(0f, 0f, 0f, 0.75f));
-                GUI.Label(new Rect(rect.x, rect.y, 18f, 18f), (index + 1).ToString(), hudBadgeStyle);
+                GUI.Label(new Rect(rect.x, rect.y, 18f, 18f), index == 0 ? "Z" : index == 1 ? "X" : string.Empty, hudBadgeStyle);
                 if (rect.Contains(Event.current.mousePosition))
                 {
                     hoveredAbilityIndex = -4;
@@ -418,7 +421,7 @@ namespace ShardsOfTheLimit.Presentation
             GUI.enabled = canAct && ready;
             Fill(new Rect(recall.x - 2f, recall.y - 2f, recall.width + 4f, recall.height + 4f),
                 recallSelected ? new Color(1f, 0.85f, 0.3f) : new Color(0.3f, 0.3f, 0.36f));
-            if (GUI.Button(recall, $"ОТЗЫВ\n({reserve.Count + 1})", hudButtonStyle))
+            if (GUI.Button(recall, "ОТЗЫВ\n(C)", hudButtonStyle))
             {
                 if (recallSelected) SelectUnit(active);
                 else BeginRecall();
@@ -542,15 +545,15 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetMouseButtonUp(1) && (mouse - rightPressPosition).sqrMagnitude < 36f && canAct)
             {
                 if (mode == InteractionMode.AbilityTargeting) CancelAbility();
-                else if (IsArchonMode) SelectUnit(selectedUnit);
+                else if (IsReserveMode) SelectUnit(selectedUnit);
                 else ClearMovementPreview();
             }
 
             if (!canAct || overHud || !Input.GetMouseButtonDown(0) || !hoveredCell.HasValue) return;
             GridCoordinate target = hoveredCell.Value;
-            if (IsArchonMode)
+            if (IsReserveMode)
             {
-                if (!RequestArchonAction(target)) status = "Эта клетка вне зелёной зоны.";
+                if (!RequestReserveAction(target)) status = "Эта клетка вне зелёной зоны.";
                 return;
             }
 
@@ -608,7 +611,7 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             GridCoordinate cell = hoveredCell.Value;
-            if (IsArchonMode) return;
+            if (IsReserveMode) return;
             if (mode == InteractionMode.AbilityTargeting)
             {
                 if (targetable.Contains(cell) && selectedAbilityTarget != cell) HandleCellChoice(cell);

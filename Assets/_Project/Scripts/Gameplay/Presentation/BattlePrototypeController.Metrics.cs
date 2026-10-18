@@ -10,7 +10,7 @@ using UnityEngine;
 namespace ShardsOfTheLimit.Presentation
 {
     /// <summary>
-    /// Playtest measurements: real time of every activation, battle length, abilities used and Archon actions.
+    /// Playtest measurements: real time of every activation, battle length, abilities used and reserve actions.
     /// At the end of a battle a plain-text report is written to the Playtests folder next to the game.
     /// </summary>
     public sealed partial class BattlePrototypeController
@@ -26,7 +26,7 @@ namespace ShardsOfTheLimit.Presentation
         private readonly Dictionary<string, int> abilityUses = new Dictionary<string, int>();
         private CombatUnit measuredUnit;
         private float activationStartedAt;
-        private int archonActions;
+        private int reserveActions;
         private bool reportWritten;
 
         /// <summary>Path of the last written playtest report, or null.</summary>
@@ -103,7 +103,7 @@ namespace ShardsOfTheLimit.Presentation
                                 $"максимум {seconds.Last():0.0} с");
             }
 
-            text.AppendLine($"Действий всего: {resolvedActions}, действий Архонта: {archonActions}");
+            text.AppendLine($"Действий всего: {resolvedActions}, призывов, замен и отзывов: {reserveActions}");
             text.AppendLine();
             text.AppendLine("Время хода по резонантам (игрок):");
             foreach (var group in player.GroupBy(r => r.Unit))

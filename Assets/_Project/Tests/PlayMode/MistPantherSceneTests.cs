@@ -13,14 +13,14 @@ using UnityEngine.TestTools;
 
 namespace ShardsOfTheLimit.Tests
 {
-    /// <summary>Main battle: the Archon swaps in the Mist Panther, which arrives in Mist and acts on its own turn.</summary>
+    /// <summary>Main battle: the toad swaps itself for the Mist Panther, which arrives in Mist and finishes the turn.</summary>
     public sealed class MistPantherSceneTests
     {
         private static object Call(object obj, string method, params object[] args) => obj.GetType()
             .GetMethod(method, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public).Invoke(obj, args);
 
         [UnityTest]
-        public IEnumerator ArchonSummonsThePantherWhichArrivesInMistAndFights()
+        public IEnumerator SwapBringsInThePantherWhichArrivesInMistAndFights()
         {
             BattlePrototypeController.SetBranchVariant("mist-panther", 0);
             SceneManager.LoadScene("Assets/_Project/Scenes/PrototypeBattle.unity");
@@ -30,19 +30,17 @@ namespace ShardsOfTheLimit.Tests
             Call(controller, "CloseOnboarding");
             Assert.That(controller.Reserve[0].Unit.DefinitionId, Is.EqualTo("mist-panther"));
 
-            yield return PassTurnsUntil(controller, unit => unit == controller.Archon);
-            CombatUnit toad = controller.Units.Single(unit => unit.DefinitionId == "blightgullet");
+            // On the toad's turn the toad swaps itself for the panther, which continues the turn with 1 AP.
+            yield return PassTurnsUntil(controller, unit => unit.DefinitionId == "blightgullet");
+            CombatUnit toad = controller.ActiveUnit;
             CombatUnit panther = controller.Reserve[0].Unit;
             Assert.That(controller.BeginSummon(0), Is.True);
-            Assert.That(controller.RequestArchonAction(toad.Cell), Is.True);
+            Assert.That(controller.RequestReserveAction(toad.Cell), Is.True);
             yield return new WaitForSeconds(1.6f);
             Assert.That(controller.Units, Has.Member(panther));
+            Assert.That(controller.ActiveUnit, Is.SameAs(panther));
             Assert.That(panther.IsInMist, Is.True, "The panther arrives in Mist.");
             yield return Capture("30-panther-arrives-in-mist.png");
-            controller.RequestEndTurn();
-            controller.RequestEndTurn();
-
-            yield return PassTurnsUntil(controller, unit => unit == panther);
             Assert.That(controller.BranchVariantName(panther), Is.EqualTo("Mist Panther · Deep Wounds"));
             var definitions = (System.Collections.Generic.Dictionary<CombatUnit, UnitDefinition>)controller.GetType()
                 .GetField("definitionsByUnit", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller);

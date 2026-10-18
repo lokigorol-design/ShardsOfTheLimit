@@ -8,64 +8,52 @@ using UnityEngine;
 namespace ShardsOfTheLimit.Presentation
 {
     /// <summary>
-    /// The Archon on the field: summon from the reserve next to itself, recall within the link radius, swap
-    /// (recall + summon into the same cell). Each resonant has an entry and a recall effect. Link Break at 0 health.
+    /// Reserve and swap without an Archon unit: on any player turn the active resonant may, for 1 AP and the shared
+    /// Concentration, summon a reserve resonant next to itself, swap itself for one (the newcomer takes over the
+    /// remaining AP of this turn) or recall another resonant. Each resonant has an entry and a recall effect.
     /// </summary>
     public sealed partial class BattlePrototypeController
     {
         private readonly List<ReserveSlot> reserve = new List<ReserveSlot>();
-        private CombatUnit archon;
         private long concentrationReadyTick;
-        private long? archonReturnTick;
         private int selectedReserveIndex = -1;
 
-        public CombatUnit Archon => archon;
         public IReadOnlyList<ReserveSlot> Reserve => reserve;
         public long ConcentrationReadyTick => concentrationReadyTick;
-        public bool IsArchon(CombatUnit unit) => unit != null && unit == archon;
+        public bool ConcentrationReady => turns != null && turns.CurrentTick >= concentrationReadyTick;
 
-        private IEnumerable<CombatUnit> FieldEcho => units.Where(unit =>
-            unit.Team == Team.Player && unit != archon && !unit.IsDefeated);
+        private IEnumerable<CombatUnit> FieldEcho => units.Where(unit => unit.Team == Team.Player && !unit.IsDefeated);
 
-        private void SpawnArchonAndReserve()
+        private void SpawnReserve()
         {
-            UnitDefinition archonDefinition = Resources.Load<UnitDefinition>("Prototype/Units/Archon");
-            if (archonDefinition == null) return;
-            GridCoordinate start = grid.Cells
-                .Where(cell => cell.IsWalkable && !IsOccupied(cell.Coordinate))
-                .Select(cell => cell.Coordinate)
-                .OrderBy(cell => cell.ManhattanDistance(new GridCoordinate(0, 2)))
-                .ThenBy(cell => cell.X)
-                .First();
-            archon = SpawnUnit(archonDefinition, Team.Player, ControlType.Player, start, new Color(0.95f, 0.78f, 0.35f));
-
-            // Mist Panther and a technical Echo wait in the stone until the Archon calls them.
+            // Mist Panther and a technical Echo wait in the stone.
             foreach (string id in new[] { "MistPanther", "RangerEcho" })
             {
                 UnitDefinition definition = Resources.Load<UnitDefinition>("Prototype/Units/" + id);
                 if (definition == null) continue;
-                CombatUnit unit = SpawnUnit(definition, Team.Player, ControlType.Player, start,
+                CombatUnit unit = SpawnUnit(definition, Team.Player, ControlType.Player, new GridCoordinate(0, 0),
                     id == "RangerEcho" ? new Color(0.25f, 0.55f, 1f) : new Color(0.78f, 0.82f, 0.9f), false);
                 reserve.Add(new ReserveSlot(unit, 0));
             }
         }
 
-        public bool ConcentrationReady => turns != null && turns.CurrentTick >= concentrationReadyTick;
+        private CombatUnit Commander => turns?.CurrentUnit;
 
-        private bool CanArchonAct(out string reason)
+        private bool CanCommand(out string reason)
         {
             reason = null;
-            if (archon == null || turns?.CurrentUnit != archon || isBusy || battleEnded) reason = "Сейчас не ход Архонта.";
-            else if (archon.CurrentActionPoints < ArchonRules.ActionCost) reason = "У Архонта не осталось ОД.";
-            else if (!ConcentrationReady)
-                reason = $"Концентрация восстановится на тике {concentrationReadyTick}.";
+            CombatUnit active = Commander;
+            if (active == null || active.ControlType != ControlType.Player || isBusy || battleEnded) reason = "Сейчас не ход игрока.";
+            else if (active.CurrentActionPoints < ReserveRules.ActionCost) reason = "Не осталось ОД.";
+            else if (active.Channel != null) reason = "Пока поддерживается способность, смена недоступна.";
+            else if (!ConcentrationReady) reason = $"Концентрация восстановится на тике {concentrationReadyTick}.";
             return reason == null;
         }
 
-        /// <summary>Summon mode: free cells within 2 of the Archon, or an own resonant in the link radius to swap.</summary>
+        /// <summary>Summon mode: free cells within 2 of the active resonant (if fewer than 3 on the field) or its own cell (swap).</summary>
         public bool BeginSummon(int reserveIndex)
         {
-            if (!CanArchonAct(out string reason))
+            if (!CanCommand(out string reason))
             {
                 status = reason;
                 return false;
@@ -78,89 +66,95 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             selectedReserveIndex = reserveIndex;
-            var cells = new List<GridCoordinate>();
-            if (FieldEcho.Count() < ArchonRules.FieldLimit)
-                cells.AddRange(ArchonRules.SummonCells(grid, archon.Cell, IsOccupied));
-            cells.AddRange(FieldEcho.Where(unit => ArchonRules.InLink(archon.Cell, unit.Cell)).Select(unit => unit.Cell));
-            EnterArchonMode(InteractionMode.Summon, cells);
-            status = $"Призыв: {reserve[reserveIndex].Unit.DisplayName}. Свободная клетка рядом с Архонтом — призвать " +
-                     "(на поле не больше 3), свой резонант в радиусе связи 4 — заменить.";
+            var cells = new List<GridCoordinate> { Commander.Cell };
+            if (FieldEcho.Count() < ReserveRules.FieldLimit)
+                cells.AddRange(ReserveRules.SummonCells(grid, Commander.Cell, IsOccupied));
+            EnterReserveMode(InteractionMode.Summon, cells);
+            status = $"{reserve[reserveIndex].Unit.DisplayName}: клетка активного резонанта — замена (сменщик получает " +
+                     "оставшиеся ОД), свободная клетка рядом — призыв (на поле не больше 3).";
             return true;
         }
 
+        /// <summary>Recall mode: another own resonant on the field returns to the reserve.</summary>
         public bool BeginRecall()
         {
-            if (!CanArchonAct(out string reason))
+            if (!CanCommand(out string reason))
             {
                 status = reason;
                 return false;
             }
 
             selectedReserveIndex = -1;
-            EnterArchonMode(InteractionMode.Recall,
-                FieldEcho.Where(unit => ArchonRules.InLink(archon.Cell, unit.Cell)).Select(unit => unit.Cell).ToArray());
-            status = "Отзыв: выбери своего резонанта в радиусе связи 4. Отзыв снимает с него отрицательные эффекты.";
+            EnterReserveMode(InteractionMode.Recall,
+                FieldEcho.Where(unit => unit != Commander).Select(unit => unit.Cell).ToArray());
+            status = "Отзыв: выбери другого своего резонанта. Отзыв снимает с него отрицательные эффекты.";
             return true;
         }
 
-        private void EnterArchonMode(InteractionMode archonMode, IReadOnlyCollection<GridCoordinate> cells)
+        private void EnterReserveMode(InteractionMode reserveMode, IReadOnlyCollection<GridCoordinate> cells)
         {
-            mode = archonMode;
+            mode = reserveMode;
             selectedDestination = null;
             selectedPath = System.Array.Empty<GridCoordinate>();
             selectedAbilityTarget = null;
             abilityPreview = null;
             previewImpact = System.Array.Empty<GridCoordinate>();
             targetable = cells;
-            targetingRange = ArchonRules.SummonCells(grid, archon.Cell, _ => false);
+            targetingRange = reserveMode == InteractionMode.Summon
+                ? ReserveRules.SummonCells(grid, Commander.Cell, _ => false)
+                : cells;
             RefreshHighlights();
         }
 
-        private bool IsArchonMode => mode == InteractionMode.Summon || mode == InteractionMode.Recall;
+        private bool IsReserveMode => mode == InteractionMode.Summon || mode == InteractionMode.Recall;
 
         /// <summary>Click in summon or recall mode.</summary>
-        public bool RequestArchonAction(GridCoordinate cell)
+        public bool RequestReserveAction(GridCoordinate cell)
         {
-            if (!IsArchonMode || !targetable.Contains(cell)) return false;
+            if (!IsReserveMode || !targetable.Contains(cell)) return false;
             CombatUnit echo = FieldEcho.FirstOrDefault(unit => unit.Cell == cell);
             if (mode == InteractionMode.Recall)
             {
-                if (echo == null) return false;
-                StartCoroutine(PerformArchonAction(echo, null, cell));
+                if (echo == null || echo == Commander) return false;
+                StartCoroutine(PerformReserveAction(echo, null, cell));
                 return true;
             }
 
             ReserveSlot slot = selectedReserveIndex >= 0 && selectedReserveIndex < reserve.Count ? reserve[selectedReserveIndex] : null;
-            if (slot == null) return false;
-            StartCoroutine(PerformArchonAction(echo, slot, cell));
+            if (slot == null || echo != null && echo != Commander) return false;
+            StartCoroutine(PerformReserveAction(echo, slot, cell));
             return true;
         }
 
-        private IEnumerator PerformArchonAction(CombatUnit recalled, ReserveSlot summoned, GridCoordinate cell)
+        private IEnumerator PerformReserveAction(CombatUnit recalled, ReserveSlot summoned, GridCoordinate cell)
         {
-            if (!archon.SpendActionPoints(ArchonRules.ActionCost)) yield break;
+            CombatUnit commander = Commander;
+            if (!commander.SpendActionPoints(ReserveRules.ActionCost)) yield break;
             isBusy = true;
-            archonActions++;
-            concentrationReadyTick = turns.CurrentTick + ArchonRules.ConcentrationTicks;
-            FaceTowards(archon, archon.Cell, cell);
-            if (unitViews.TryGetValue(archon, out CombatUnitView archonView))
-                AbilityVfx.ArchonCommand(archonView.transform.position);
-            if (recalled != null) yield return RecallEcho(recalled);
-            if (summoned != null) yield return SummonEcho(summoned, cell);
+            reserveActions++;
+            concentrationReadyTick = turns.CurrentTick + ReserveRules.ConcentrationTicks;
+            if (unitViews.TryGetValue(commander, out CombatUnitView commanderView))
+                AbilityVfx.StoneCommand(commanderView.transform.position);
+            bool swap = recalled == commander;
+            int remaining = commander.CurrentActionPoints;
+            if (swap) MeasureActivationEnd(commander);
+            if (recalled != null) yield return RecallEcho(recalled, swap ? summoned?.Unit : null);
+            if (summoned != null) yield return SummonEcho(summoned, cell, swap ? commander.Facing : commander.Facing, swap, remaining);
             resolvedActions++;
             isBusy = false;
             ClearInteractionState();
             selectedReserveIndex = -1;
             if (EvaluateBattleEnd()) yield break;
-            SelectUnit(archon);
+            CombatUnit active = turns.CurrentUnit;
+            SelectUnit(active);
             RefreshNextEnemyIntent();
-            if (archon.CurrentActionPoints == 0) StartCoroutine(EndTurnAfterDelay());
+            if (active.CurrentActionPoints == 0) StartCoroutine(EndTurnAfterDelay());
         }
 
-        private IEnumerator RecallEcho(CombatUnit echo)
+        private IEnumerator RecallEcho(CombatUnit echo, CombatUnit successor)
         {
             GridCoordinate cell = echo.Cell;
-            feedback.AddLog($"Архонт отзывает {echo.DisplayName}");
+            feedback.AddLog($"Отзыв: {echo.DisplayName} уходит в камень");
             if (unitViews.TryGetValue(echo, out CombatUnitView view))
             {
                 yield return AbilityVfx.RecallBeam(view.transform);
@@ -173,21 +167,35 @@ namespace ShardsOfTheLimit.Presentation
             if (cleansed > 0) feedback.AddLog($"{echo.DisplayName}: отзыв снял отрицательных эффектов: {cleansed}");
             echo.EndChannel();
             units.Remove(echo);
-            turns.RemoveUnit(echo);
-            reserve.Add(new ReserveSlot(echo, turns.CurrentTick + ArchonRules.ReturnLockTicks));
+            // The active resonant hands its turn to the one swapped in; anyone else simply leaves the timeline.
+            if (successor != null && echo == turns.CurrentUnit)
+            {
+                successor.MoveTo(cell);
+                turns.ReplaceCurrent(echo, successor);
+            }
+            else turns.RemoveUnit(echo);
+            reserve.Add(new ReserveSlot(echo, turns.CurrentTick + ReserveRules.ReturnLockTicks));
             RefreshCloudViews();
         }
 
-        private IEnumerator SummonEcho(ReserveSlot slot, GridCoordinate cell)
+        private IEnumerator SummonEcho(ReserveSlot slot, GridCoordinate cell, GridCoordinate facing, bool swap, int remainingActionPoints)
         {
             CombatUnit echo = slot.Unit;
             reserve.Remove(slot);
             echo.MoveTo(cell);
-            echo.SetFacing(archon.Facing);
+            echo.SetFacing(facing);
             units.Add(echo);
-            turns.AddUnit(echo, turns.CurrentTick + SpeedTimeline.GetInterval(echo.EffectiveSpeed));
+            if (swap)
+            {
+                // The newcomer continues this turn with the AP that were left.
+                echo.BeginActivation(remainingActionPoints);
+                MeasureActivationStart(echo);
+            }
+            else turns.AddUnit(echo, turns.CurrentTick + SpeedTimeline.GetInterval(echo.EffectiveSpeed));
+
             CombatUnitView view = CreateUnitView(echo);
-            feedback.AddLog($"Архонт призывает {echo.DisplayName} в {cell}");
+            feedback.AddLog(swap ? $"Замена: {echo.DisplayName} выходит в {cell} с {remainingActionPoints} ОД"
+                : $"Призыв: {echo.DisplayName} выходит в {cell}");
             yield return AbilityVfx.SummonPortal(view.transform, EffectWorldPosition(cell));
             yield return EntryEffect(echo, cell);
             RefreshCloudViews();
@@ -288,8 +296,6 @@ namespace ShardsOfTheLimit.Presentation
                     break;
                 }
             }
-
-            yield break;
         }
 
         private void AddCloudAt(CombatUnit owner, string cloudId, GridCoordinate cell, bool useShape)
@@ -301,35 +307,6 @@ namespace ShardsOfTheLimit.Presentation
                 : new[] { cell };
             areaEffects.Add(areaEffects.PreviewCloud(owner, cloudId, definition.Snapshot(), cells, owner.Facing,
                 grid.GetCell(cell).Height, turns.CurrentTick));
-        }
-
-        /// <summary>Link Break: at 0 health the Archon is out for 3 turns, then gets up with 30% health.</summary>
-        private void UpdateArchonLink()
-        {
-            if (archon == null || turns == null) return;
-            if (archon.IsDefeated && !archonReturnTick.HasValue)
-            {
-                archonReturnTick = turns.CurrentTick + ArchonRules.LinkBreakTicks;
-                feedback.AddLog($"Разрыв связи: Архонт выбыл до тика {archonReturnTick.Value}, смены недоступны");
-                return;
-            }
-
-            if (!archon.IsDefeated || turns.CurrentTick < archonReturnTick.Value) return;
-            GridCoordinate cell = IsOccupied(archon.Cell)
-                ? grid.Cells.Where(c => c.IsWalkable && !IsOccupied(c.Coordinate)).Select(c => c.Coordinate)
-                    .OrderBy(c => c.ManhattanDistance(archon.Cell)).First()
-                : archon.Cell;
-            archon.MoveTo(cell);
-            archon.Revive(ArchonRules.ReviveHealth(archon.MaximumHealth));
-            archonReturnTick = null;
-            turns.SetNextActivation(archon, turns.CurrentTick + SpeedTimeline.GetInterval(archon.EffectiveSpeed));
-            if (unitViews.TryGetValue(archon, out CombatUnitView view))
-            {
-                view.gameObject.SetActive(true);
-                view.transform.position = UnitWorldPosition(cell);
-            }
-
-            feedback.AddLog($"Архонт встаёт с {archon.CurrentHealth} здоровья");
         }
     }
 }

@@ -39,9 +39,6 @@ namespace ShardsOfTheLimit.Presentation
                 case "crimson-brute":
                     BuildBrute(root.transform, primary, accent, dark);
                     break;
-                case "archon":
-                    BuildArchon(root.transform, primary, accent, dark);
-                    break;
                 case "mist-panther":
                     BuildPanther(root.transform, primary, accent, dark);
                     break;
@@ -130,27 +127,6 @@ namespace ShardsOfTheLimit.Presentation
                 Vector3.one * 0.28f, dark);
             AddLegs(root, dark, 0.21f);
         }
-
-        /// <summary>The Archon: a hooded figure in a long coat with a staff holding a glowing resonance stone.</summary>
-        private static void BuildArchon(Transform root, Color primary, Color accent, Color dark)
-        {
-            Color coat = new Color(0.16f, 0.18f, 0.26f);
-            AddPart(root, "Coat", PrimitiveType.Cylinder, new Vector3(0f, -0.22f, 0f),
-                new Vector3(0.42f, 0.36f, 0.42f), coat);
-            AddPart(root, "Torso", PrimitiveType.Capsule, new Vector3(0f, 0.12f, 0f),
-                new Vector3(0.34f, 0.32f, 0.3f), coat);
-            AddPart(root, "Mantle", PrimitiveType.Sphere, new Vector3(0f, 0.3f, 0f),
-                new Vector3(0.46f, 0.16f, 0.4f), new Color(0.55f, 0.42f, 0.2f));
-            AddPart(root, "Hood", PrimitiveType.Sphere, new Vector3(0f, 0.5f, 0.02f),
-                new Vector3(0.26f, 0.28f, 0.27f), Color.Lerp(coat, Color.black, 0.35f));
-            AddPart(root, "Face", PrimitiveType.Sphere, new Vector3(0f, 0.48f, -0.08f),
-                new Vector3(0.15f, 0.15f, 0.1f), new Color(0.85f, 0.7f, 0.58f));
-            AddPart(root, "Staff", PrimitiveType.Cylinder, new Vector3(0.3f, 0.05f, -0.06f),
-                new Vector3(0.04f, 0.6f, 0.04f), new Color(0.35f, 0.24f, 0.14f));
-            AddPart(root, "Resonance Stone", PrimitiveType.Sphere, new Vector3(0.3f, 0.7f, -0.06f),
-                Vector3.one * 0.15f, accent);
-        }
-
         /// <summary>Mist Panther placeholder: a low feline body, long tail and pale misty mane.</summary>
         private static void BuildPanther(Transform root, Color primary, Color accent, Color dark)
         {

@@ -93,6 +93,20 @@ namespace ShardsOfTheLimit.Domain
 
         public bool Contains(CombatUnit unit) => units.Contains(unit);
 
+        /// <summary>
+        /// Swap: the resonant whose turn it is leaves the timeline and the one replacing it continues this activation;
+        /// its own next turn is scheduled from now when the activation ends.
+        /// </summary>
+        public void ReplaceCurrent(CombatUnit outgoing, CombatUnit incoming)
+        {
+            if (outgoing == null || incoming == null) throw new ArgumentNullException(outgoing == null ? nameof(outgoing) : nameof(incoming));
+            if (outgoing != CurrentUnit) throw new InvalidOperationException("Only the active resonant can be swapped out.");
+            units.Remove(outgoing);
+            nextActivationTicks.Remove(outgoing);
+            AddUnit(incoming, CurrentTick);
+            CurrentUnit = incoming;
+        }
+
         public long CurrentTick { get; private set; }
         public CombatUnit CurrentUnit { get; private set; }
         public IReadOnlyList<CombatUnit> LivingUnits => units.Where(unit => !unit.IsDefeated).ToArray();

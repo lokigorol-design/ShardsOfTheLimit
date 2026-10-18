@@ -52,7 +52,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(controller.ActiveUnit.DisplayName, Is.EqualTo("Primal Idol"));
             Assert.That(controller.ActiveUnit.CurrentActionPoints, Is.EqualTo(2));
             Assert.That(Object.FindObjectsByType<CellView>().Length, Is.EqualTo(100));
-            Assert.That(Object.FindObjectsByType<CombatUnitView>().Length, Is.EqualTo(7), "3 Echo, the Archon and 3 opponents.");
+            Assert.That(Object.FindObjectsByType<CombatUnitView>().Length, Is.EqualTo(6), "3 Echo and 3 opponents; no Archon unit.");
             CombatUnitView[] unitViews = Object.FindObjectsByType<CombatUnitView>();
             CombatUnitView blazeView = unitViews.Single(view => view.Unit.DefinitionId == "blaze-worm");
             Assert.That(blazeView.GetComponentsInChildren<Renderer>().Length, Is.GreaterThanOrEqualTo(1));
@@ -77,15 +77,15 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blazeRenderer.material.GetTexture("_BumpMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_MetallicGlossMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_EmissionMap"), Is.Not.Null);
-            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm" && view.Unit.DefinitionId != "blightgullet" && view.Unit.DefinitionId != "primal-idol" && view.Unit.DefinitionId != "archon")
+            Assert.That(unitViews.Where(view => view.Unit.DefinitionId != "blaze-worm" && view.Unit.DefinitionId != "blightgullet" && view.Unit.DefinitionId != "primal-idol" && view.Unit.DefinitionId != "mist-panther")
                 .All(view => view.GetComponentsInChildren<Renderer>().Length >= 5), Is.True,
                 "Remaining temporary models must keep readable composite silhouettes.");
             ObstacleView[] obstacles = Object.FindObjectsByType<ObstacleView>();
             Assert.That(obstacles.Length, Is.EqualTo(5));
             Assert.That(obstacles.All(obstacle =>
                 obstacle.GetComponent<MeshFilter>().sharedMesh.vertexCount > 20), Is.True, "Obstacles are rock formations.");
-            Assert.That(controller.Units.Count(unit => unit.Team == Team.Player && unit != controller.Archon), Is.EqualTo(3));
-            Assert.That(controller.Reserve.Count, Is.EqualTo(2), "Two resonants wait in the Archon's reserve.");
+            Assert.That(controller.Units.Count(unit => unit.Team == Team.Player), Is.EqualTo(3));
+            Assert.That(controller.Reserve.Count, Is.EqualTo(2), "Two resonants wait in the reserve.");
             Assert.That(controller.Units.Any(unit => unit.DefinitionId == "blightgullet"), Is.True, "The toad fights in the main battle.");
             Assert.That(controller.Units.Any(unit => unit.DefinitionId == "primal-idol"), Is.True, "Primal Idol fights in the main battle.");
             Assert.That(controller.Units.Count(unit => unit.Team == Team.Opponent), Is.EqualTo(3));

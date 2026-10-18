@@ -20,7 +20,13 @@ namespace ShardsOfTheLimit.Domain
         Vulnerability,
         /// <summary>Purifying Flame (positive): cleanses negative effects at the start of each own turn;
         /// melee attackers catch fire.</summary>
-        PurifyingFlame
+        PurifyingFlame,
+        /// <summary>Enemies cannot target the unit; areas still hit it. Ends after 2 turns or at its first attack.</summary>
+        Invisibility,
+        /// <summary>Mist: nobody can target the unit and no effect touches it. Ends after 2 turns or at its first attack.</summary>
+        Mist,
+        /// <summary>Every time the bearer spends AP it takes 0,15 × ATK of the source per stack (periodic, BLEED).</summary>
+        Bleed
     }
 
     public static class StatusMechanicRules
@@ -38,7 +44,10 @@ namespace ShardsOfTheLimit.Domain
         public static bool IsNegative(StatusRules rules) =>
             rules.PreventsMovement || rules.Mechanic == StatusMechanic.Poison || rules.Mechanic == StatusMechanic.Corrosion ||
             rules.Mechanic == StatusMechanic.Oil || rules.Mechanic == StatusMechanic.Slow ||
-            rules.Mechanic == StatusMechanic.Vulnerability || rules.DamagePerStack > 0;
+            rules.Mechanic == StatusMechanic.Vulnerability || rules.Mechanic == StatusMechanic.Bleed || rules.DamagePerStack > 0;
+
+        public const string BleedResistanceId = "BLEED";
+        public const double BleedAttackFraction = 0.15d;
 
         public static double PoisonPulse(int maximumHealth, int stacks) =>
             stacks <= 0 ? 0 : maximumHealth * PoisonBaseFraction * Math.Pow(stacks, PoisonStackExponent);
@@ -61,7 +70,7 @@ namespace ShardsOfTheLimit.Domain
         }
 
         /// <summary>True when the status deals damage on its own pulses.</summary>
-        public bool Pulses => DamagePerStack > 0 || Mechanic == StatusMechanic.Poison;
+        public bool Pulses => DamagePerStack > 0 && Mechanic != StatusMechanic.Bleed || Mechanic == StatusMechanic.Poison;
     }
 
     public sealed class StackStatusState

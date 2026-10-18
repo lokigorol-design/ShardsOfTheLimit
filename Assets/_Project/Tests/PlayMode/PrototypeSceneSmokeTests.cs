@@ -37,7 +37,7 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RepulseStrike"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/RaiseGround"), Is.Not.Null);
             Assert.That(Resources.Load<AbilityDefinition>("Prototype/Abilities/LowerGround"), Is.Not.Null);
-            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(24));
+            Assert.That(Resources.LoadAll<AbilityDefinition>("Prototype/Abilities").Length, Is.EqualTo(28), "24 + Mist Panther's four.");
             Assert.That(blazeDefinition.Abilities.Count, Is.EqualTo(4));
             Assert.That(blazeDefinition.Abilities.All(ability => ability.Icon != null), Is.True);
             BattlePrototypeController controller = Object.FindAnyObjectByType<BattlePrototypeController>();

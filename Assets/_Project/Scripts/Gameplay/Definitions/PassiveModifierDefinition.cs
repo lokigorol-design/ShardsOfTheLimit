@@ -50,6 +50,16 @@ namespace ShardsOfTheLimit.Definitions
         [Header("Primal Idol IV — Raging Tornado: Lift Trap throws 6 units instead of 4, pushes 3 cells instead of 2")]
         public bool ragingTornado;
 
+        [Header("Mist Panther I — Mist Veil: any Invisibility becomes Mist; an attack from Mist applies Vulnerability")]
+        public bool mistVeil;
+        [Header("Mist Panther II — Deep Wounds: Bleed from this resonant stacks")]
+        public bool deepWounds;
+        [Header("Shadow Panther II — Return to Shadow: a kill from Invisibility resets Vanishing Step")]
+        public bool returnToShadow;
+        public AbilityDefinition vanishingAbility;
+        [Header("Shadow Panther III — Silent Executioner: from Invisibility at a target below 50% health, +40% more")]
+        public bool silentExecutioner;
+
         public PassiveModifiers Snapshot() => new PassiveModifiers(toxicCocktail ? cloudStacksMultiplier : 1,
             toxicCocktail ? cloudStacksBonus : 0, nativeMire, nativeMireHealPercent,
             bloodOfTheDeep ? bloodOfTheDeepHealPercent : 0);

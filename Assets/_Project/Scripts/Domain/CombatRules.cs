@@ -241,6 +241,8 @@ namespace ShardsOfTheLimit.Domain
             if (cost < 0) throw new ArgumentOutOfRangeException(nameof(cost));
             if (cost > CurrentActionPoints) return false;
             CurrentActionPoints -= cost;
+            // Bleed (16.10.8): spending AP hurts; the battle presents the hits from TakeBleedHits.
+            if (cost > 0) pendingBleedHits.AddRange(TriggerBleed());
             return true;
         }
 

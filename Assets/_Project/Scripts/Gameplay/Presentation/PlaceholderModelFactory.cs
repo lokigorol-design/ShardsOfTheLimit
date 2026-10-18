@@ -42,6 +42,9 @@ namespace ShardsOfTheLimit.Presentation
                 case "archon":
                     BuildArchon(root.transform, primary, accent, dark);
                     break;
+                case "mist-panther":
+                    BuildPanther(root.transform, primary, accent, dark);
+                    break;
                 default:
                     BuildRaider(root.transform, primary, accent, dark);
                     break;
@@ -146,6 +149,32 @@ namespace ShardsOfTheLimit.Presentation
                 new Vector3(0.04f, 0.6f, 0.04f), new Color(0.35f, 0.24f, 0.14f));
             AddPart(root, "Resonance Stone", PrimitiveType.Sphere, new Vector3(0.3f, 0.7f, -0.06f),
                 Vector3.one * 0.15f, accent);
+        }
+
+        /// <summary>Mist Panther placeholder: a low feline body, long tail and pale misty mane.</summary>
+        private static void BuildPanther(Transform root, Color primary, Color accent, Color dark)
+        {
+            Color fur = new Color(0.32f, 0.35f, 0.42f);
+            Color mist = new Color(0.82f, 0.86f, 0.92f);
+            AddPart(root, "Body", PrimitiveType.Capsule, new Vector3(0f, -0.2f, 0.04f),
+                new Vector3(0.36f, 0.42f, 0.36f), fur, new Vector3(90f, 0f, 0f));
+            AddPart(root, "Chest", PrimitiveType.Sphere, new Vector3(0f, -0.12f, -0.26f),
+                new Vector3(0.36f, 0.34f, 0.32f), fur);
+            AddPart(root, "Head", PrimitiveType.Sphere, new Vector3(0f, 0.06f, -0.48f),
+                new Vector3(0.26f, 0.22f, 0.28f), fur);
+            AddPart(root, "Mane", PrimitiveType.Sphere, new Vector3(0f, 0.02f, -0.36f),
+                new Vector3(0.38f, 0.3f, 0.2f), mist);
+            AddPart(root, "Left Ear", PrimitiveType.Cube, new Vector3(-0.08f, 0.2f, -0.46f),
+                new Vector3(0.05f, 0.1f, 0.04f), fur, new Vector3(0f, 0f, 15f));
+            AddPart(root, "Right Ear", PrimitiveType.Cube, new Vector3(0.08f, 0.2f, -0.46f),
+                new Vector3(0.05f, 0.1f, 0.04f), fur, new Vector3(0f, 0f, -15f));
+            AddPart(root, "Left Eye", PrimitiveType.Sphere, new Vector3(-0.07f, 0.09f, -0.6f), Vector3.one * 0.05f, accent);
+            AddPart(root, "Right Eye", PrimitiveType.Sphere, new Vector3(0.07f, 0.09f, -0.6f), Vector3.one * 0.05f, accent);
+            AddPart(root, "Tail", PrimitiveType.Cylinder, new Vector3(0f, -0.05f, 0.5f),
+                new Vector3(0.05f, 0.24f, 0.05f), mist, new Vector3(-55f, 0f, 0f));
+            foreach (float x in new[] { -0.14f, 0.14f })
+            foreach (float z in new[] { -0.25f, 0.25f })
+                AddPart(root, "Leg", PrimitiveType.Cylinder, new Vector3(x, -0.45f, z), new Vector3(0.07f, 0.13f, 0.07f), dark);
         }
 
         private static void BuildRaider(Transform root, Color primary, Color accent, Color dark)

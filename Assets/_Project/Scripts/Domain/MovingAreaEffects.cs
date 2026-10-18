@@ -217,7 +217,7 @@ namespace ShardsOfTheLimit.Domain
         public DamageResult EnterMagma(CombatUnit unit, GridCoordinate cell)
         {
             MagmaCell hot = MagmaAt(cell);
-            if (hot == null || unit == null || unit.IsDefeated) return null;
+            if (hot == null || unit == null || unit.IsDefeated || unit.IsInMist) return null;
             DamageResult burn = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState, hot.Power, MagmaResistanceId);
             CombatEffectResolver.Apply(new[] { burn });
             return burn;
@@ -239,7 +239,7 @@ namespace ShardsOfTheLimit.Domain
         public TrapTrigger TriggerTrap(CombatUnit unit, GridCoordinate cell)
         {
             TrapObject trap = TrapAt(cell);
-            if (trap == null || unit == null || unit.IsDefeated) return null;
+            if (trap == null || unit == null || unit.IsDefeated || unit.IsInMist) return null;
             traps.Remove(trap);
             var trigger = new TrapTrigger(trap);
             if (trap.PushDirection.HasValue)
@@ -312,7 +312,7 @@ namespace ShardsOfTheLimit.Domain
             {
                 if (cloud.NextPulseTick == tick)
                 {
-                    foreach (var unit in units.Where(u => !u.IsDefeated && !IsImmuneToClouds(u) && cloud.Contains(grid, u.Cell)))
+                    foreach (var unit in units.Where(u => !u.IsDefeated && !u.IsInMist && !IsImmuneToClouds(u) && cloud.Contains(grid, u.Cell)))
                     {
                         unit.Statuses.TryGetValue(cloud.Rules.Status.Id, out var previous);
                         var status = StatusCalculator.Apply(unit, cloud.Rules.Status, cloud.StacksPerTick, tick, cloud.OwnerId, previous);
@@ -332,7 +332,7 @@ namespace ShardsOfTheLimit.Domain
             {
                 strikes.Remove(strike);
                 firedStrikes.Add(strike);
-                foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && strike.Cells.Contains(u.Cell)).ToArray())
+                foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && !u.IsInMist && strike.Cells.Contains(u.Cell)).ToArray())
                 {
                     DamageResult hit = CombatEffectCalculator.Damage(unit, unit.ResourceState, strike.RawDamage);
                     CombatEffectResolver.Apply(new[] { hit });
@@ -349,7 +349,7 @@ namespace ShardsOfTheLimit.Domain
             {
                 if (hot.NextPulseTick == tick && hot.NextPulseTick <= hot.ExpireTick)
                 {
-                    foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && u.Cell == hot.Cell).ToArray())
+                    foreach (CombatUnit unit in units.Where(u => !u.IsDefeated && !u.IsInMist && u.Cell == hot.Cell).ToArray())
                     {
                         DamageResult burn = CombatEffectCalculator.PeriodicDamage(unit, unit.ResourceState, hot.Power, MagmaResistanceId);
                         CombatEffectResolver.Apply(new[] { burn });

@@ -39,13 +39,13 @@ namespace ShardsOfTheLimit.Presentation
                 .First();
             archon = SpawnUnit(archonDefinition, Team.Player, ControlType.Player, start, new Color(0.95f, 0.78f, 0.35f));
 
-            // Technical Echo wait in the stone until the Archon calls them.
-            foreach (string id in new[] { "RangerEcho", "SkirmisherEcho" })
+            // Mist Panther and a technical Echo wait in the stone until the Archon calls them.
+            foreach (string id in new[] { "MistPanther", "RangerEcho" })
             {
                 UnitDefinition definition = Resources.Load<UnitDefinition>("Prototype/Units/" + id);
                 if (definition == null) continue;
                 CombatUnit unit = SpawnUnit(definition, Team.Player, ControlType.Player, start,
-                    id == "RangerEcho" ? new Color(0.25f, 0.55f, 1f) : new Color(0.2f, 0.9f, 0.75f), false);
+                    id == "RangerEcho" ? new Color(0.25f, 0.55f, 1f) : new Color(0.78f, 0.82f, 0.9f), false);
                 reserve.Add(new ReserveSlot(unit, 0));
             }
         }
@@ -242,6 +242,15 @@ namespace ShardsOfTheLimit.Presentation
                     feedback.AddLog($"Вход {echo.DisplayName}: встаёт на столб");
                     break;
                 }
+                case "mist-panther":
+                {
+                    // Appears in Mist.
+                    var mist = StatusCalculator.Apply(echo, StealthRules.Mist, 1, turns.CurrentTick, echo.Id);
+                    echo.ApplyStatus(mist);
+                    results.Add(mist);
+                    feedback.AddLog($"Вход {echo.DisplayName}: появляется в Тумане");
+                    break;
+                }
             }
 
             if (results.Count > 0) PresentTimelineResults(results);
@@ -263,6 +272,21 @@ namespace ShardsOfTheLimit.Presentation
                     areaEffects.AddTrap(new TrapObject(echo, "LiftTrap", cell, turns.CurrentTick + 300, 10));
                     feedback.AddLog($"Отзыв {echo.DisplayName}: Ловушка вихря на клетке");
                     break;
+                case "mist-panther":
+                {
+                    // A free Parting Strike on a neighbouring enemy before leaving.
+                    AbilityDefinition parting = definitionsByUnit[echo].Abilities.FirstOrDefault(a => a.StableId == "PartingStrike");
+                    if (parting == null) break;
+                    var targets = Runtime.AbilityRuntime.GetTargetableCells(parting, grid, echo, units);
+                    if (targets.Count == 0) break;
+                    Runtime.AbilityResolution strike = Runtime.AbilityRuntime.Execute(parting, grid, echo, targets.First(), units,
+                        turns.CurrentTick, areaEffects, ModifiersOf(echo));
+                    PresentTimelineResults(strike.Results.Where(result => !(result is PushResult)).ToArray());
+                    foreach (PushResult push in strike.Results.OfType<PushResult>().Where(push => push.Target != echo && push.StepsMoved > 0))
+                        yield return AnimateForcedMovement(push);
+                    feedback.AddLog($"Отзыв {echo.DisplayName}: Удар отхода");
+                    break;
+                }
             }
 
             yield break;

@@ -471,6 +471,22 @@ namespace ShardsOfTheLimit.Presentation
             vfx.Shake(0.05f, 0.15f);
         }
 
+        /// <summary>Invisibility shimmers faintly; Mist wraps the resonant in drifting white fog.</summary>
+        public static void StealthMark(Vector3 position, bool mist)
+        {
+            VfxSystem vfx = VfxSystem.Instance;
+            if (mist)
+            {
+                ParticleSpec fog = ParticleSpec.Smoke(new Color(0.85f, 0.9f, 0.95f, 0.35f), 0.55f, 1.4f);
+                fog.Velocity = new Vector3(Random.Range(-0.15f, 0.15f), 0.12f, Random.Range(-0.15f, 0.15f));
+                vfx.Emit(position + new Vector3(Random.Range(-0.35f, 0.35f), Random.Range(-0.4f, 0.3f), Random.Range(-0.35f, 0.35f)), fog);
+                return;
+            }
+
+            if (Random.value < 0.5f)
+                vfx.Emit(position + Random.insideUnitSphere * 0.4f, ParticleSpec.Sparks(new Color(0.6f, 0.7f, 1f, 0.6f), 0.2f, 0.04f));
+        }
+
         /// <summary>Short fire flare on one cell (worm entry).</summary>
         public static void FireBurstAt(Vector3 position) => FireImpact(position, 0.5f);
 

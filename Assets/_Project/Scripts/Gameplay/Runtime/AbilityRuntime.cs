@@ -30,6 +30,8 @@ namespace ShardsOfTheLimit.Runtime
         public int ChannelStage { get; internal set; }
         /// <summary>True when the channel ended with this resolution (last stage reached).</summary>
         public bool ChannelEnded { get; internal set; }
+        /// <summary>The attack came from Invisibility (Return to Shadow resets Vanishing Step on a kill).</summary>
+        public bool FromInvisibility { get; internal set; }
     }
 
     /// <summary>Single source of targeting, preview and execution math for prototype abilities.</summary>
@@ -95,6 +97,21 @@ namespace ShardsOfTheLimit.Runtime
                 return source.Cell.FourWayNeighbors().Where(grid.Contains).ToArray();
             }
 
+            // Wide Swipe picks a direction like a channel: any of the four neighbouring cells.
+            if (ability.Effects.OfType<SweepEffectDefinition>().Any())
+                return source.Cell.FourWayNeighbors().Where(grid.Contains).ToArray();
+
+            DashEffectDefinition dash = ability.Effects.OfType<DashEffectDefinition>().FirstOrDefault();
+            if (dash != null)
+            {
+                return battleUnits
+                    .Where(unit => !unit.IsDefeated && unit != source && CanBeTargeted(source, unit) &&
+                                   IsTeamEligible(source, unit, ability.TargetTeam) &&
+                                   DashPath(grid, source, unit.Cell, dash.maxDistance, battleUnits) != null)
+                    .Select(unit => unit.Cell)
+                    .ToArray();
+            }
+
             IReadOnlyCollection<GridCoordinate> geometricTargets =
                 GetTargetingRangeCells(ability, grid, source);
 
@@ -145,12 +162,64 @@ namespace ShardsOfTheLimit.Runtime
             return battleUnits
                 .Where(unit => !unit.IsDefeated)
                 .Where(unit => IsTeamEligible(source, unit, ability.TargetTeam))
+                .Where(unit => CanBeTargeted(source, unit))
                 .Where(unit => geometricSet.Contains(unit.Cell))
                 .Select(unit => unit.Cell)
                 .Distinct()
                 .OrderBy(coordinate => coordinate.X)
                 .ThenBy(coordinate => coordinate.Y)
                 .ToArray();
+        }
+
+        /// <summary>Invisible resonants cannot be chosen by enemies; nobody can choose a resonant in Mist.</summary>
+        public static bool CanBeTargeted(CombatUnit source, CombatUnit unit) =>
+            unit == source || !unit.IsInMist && !(unit.IsInvisible && unit.Team != source.Team);
+
+        /// <summary>An attack ends Invisibility and Mist and gets the bonuses from them.</summary>
+        public static bool IsAttack(AbilityDefinition ability) => ability.Effects.Any(effect =>
+            effect is DamageEffectDefinition || effect is ChannelConeEffectDefinition || effect is PushEffectDefinition ||
+            effect is PullEffectDefinition || effect is PullToPointEffectDefinition || effect is DelayedStrikeEffectDefinition ||
+            effect is ApplyBurnEffectDefinition);
+
+        /// <summary>
+        /// Dash path: straight along one of the four lines towards the target, over free walkable cells, ending next to it.
+        /// Null when the target is not on a line, too far, or the path is blocked. A neighbour needs no movement.
+        /// </summary>
+        public static IReadOnlyList<GridCoordinate> DashPath(TacticalGrid grid, CombatUnit source, GridCoordinate target,
+            int maxDistance, IEnumerable<CombatUnit> units)
+        {
+            int dx = target.X - source.Cell.X, dy = target.Y - source.Cell.Y;
+            if (dx != 0 && dy != 0 || dx == 0 && dy == 0) return null;
+            int distance = Math.Abs(dx) + Math.Abs(dy);
+            if (distance - 1 > maxDistance) return null;
+            var step = new GridCoordinate(Math.Sign(dx), Math.Sign(dy));
+            var path = new List<GridCoordinate> { source.Cell };
+            GridCoordinate current = source.Cell;
+            for (int index = 1; index < distance; index++)
+            {
+                var next = new GridCoordinate(current.X + step.X, current.Y + step.Y);
+                if (units.Any(unit => !unit.IsDefeated && unit != source && unit.Cell == next) ||
+                    !grid.TryGetMovementCost(current, next, out _)) return null;
+                path.Add(next);
+                current = next;
+            }
+
+            return path;
+        }
+
+        /// <summary>Rows of 3 cells in front of the origin (Wide Swipe).</summary>
+        public static IReadOnlyList<GridCoordinate> SweepCells(TacticalGrid grid, GridCoordinate origin, GridCoordinate direction, int rows)
+        {
+            var side = new GridCoordinate(-direction.Y, direction.X);
+            var cells = new List<GridCoordinate>();
+            for (int row = 1; row <= rows; row++)
+            for (int offset = -1; offset <= 1; offset++)
+            {
+                var cell = new GridCoordinate(origin.X + direction.X * row + side.X * offset, origin.Y + direction.Y * row + side.Y * offset);
+                if (grid.Contains(cell)) cells.Add(cell);
+            }
+
+            return cells;
         }
 
         public static IReadOnlyCollection<GridCoordinate> GetTargetingHighlightCells(
@@ -203,6 +272,10 @@ namespace ShardsOfTheLimit.Runtime
                     : ability.Effects.OfType<PullToPointEffectDefinition>().Any() ? 1 + MagnetReach(ability, modifiers) : 1;
                 return Ray(grid, front, outward, length).ToArray();
             }
+
+            SweepEffectDefinition sweep = ability.Effects.OfType<SweepEffectDefinition>().FirstOrDefault();
+            if (sweep != null && source != null)
+                return SweepCells(grid, source.Cell, CloudAreaEffect.DirectionFrom(source.Cell, selectedTarget), sweep.rows).ToArray();
 
             var cloud = ability.Effects.OfType<CreateCloudEffectDefinition>().FirstOrDefault();
             if (cloud != null) return cloud.cloud.areaShape.Evaluate(grid, selectedTarget)
@@ -276,7 +349,7 @@ namespace ShardsOfTheLimit.Runtime
             IReadOnlyCollection<GridCoordinate> affected = GetImpactCells(ability, grid, selectedTarget, source, onWall, modifiers);
             var affectedSet = new HashSet<GridCoordinate>(affected);
             CombatUnit[] affectedTargets = battleUnits
-                .Where(unit => !unit.IsDefeated && affectedSet.Contains(unit.Cell))
+                .Where(unit => !unit.IsDefeated && affectedSet.Contains(unit.Cell) && (!unit.IsInMist || unit == source))
                 .ToArray();
             GridCoordinate magnetPoint = onWall ? front : selectedTarget;
             PullToPointEffectDefinition magnet = ability.Effects.OfType<PullToPointEffectDefinition>().FirstOrDefault();
@@ -339,6 +412,21 @@ namespace ShardsOfTheLimit.Runtime
                 TrackBurn(retaliation, forecastBurning, forecastStatuses);
             }
 
+            // Invisibility and Mist (Mist Panther): the first attack reveals the resonant. From Invisibility it hits +40%
+            // (Silent Executioner: another +40% at a target below half health); from Mist it applies Vulnerability.
+            bool attack = IsAttack(ability);
+            bool fromInvisibility = attack && source.IsInvisible;
+            bool fromMist = attack && source.IsInMist;
+
+            double StealthBonus(CombatUnit target, CombatResourceState state)
+            {
+                if (!fromInvisibility || target == source) return 1d;
+                double bonus = 1d + StealthRules.InvisibilityBonus;
+                if (modifiers != null && modifiers.silentExecutioner && state.Health * 2 < target.MaximumHealth)
+                    bonus += StealthRules.ExecutionerBonus;
+                return bonus;
+            }
+
             ChannelConeEffectDefinition channel = ability.Effects.OfType<ChannelConeEffectDefinition>().FirstOrDefault();
             if (channel != null)
             {
@@ -349,7 +437,8 @@ namespace ShardsOfTheLimit.Runtime
                 {
                     if (forecast[target].Health <= 0) continue;
                     DamageResult hit = CombatEffectCalculator.Damage(target, forecast[target],
-                        multiplier * source.Attack * HitMultiplier(ability, grid, target, source.Cell, forecastPositions[target]));
+                        multiplier * source.Attack * HitMultiplier(ability, grid, target, source.Cell, forecastPositions[target]) *
+                        StealthBonus(target, forecast[target]));
                     results.Add(hit);
                     forecast[target] = CombatEffectCalculator.Apply(forecast[target], hit);
                     if (forecast[target].Health > 0)
@@ -360,7 +449,37 @@ namespace ShardsOfTheLimit.Runtime
 
             foreach (AbilityEffectDefinition effect in ability.Effects)
             {
-                if (effect is ChannelConeEffectDefinition) continue;
+                if (effect is ChannelConeEffectDefinition || effect is SweepEffectDefinition) continue;
+                if (effect is DashEffectDefinition dashEffect)
+                {
+                    // Dash: the resonant runs up to the target first; the hits that follow come from the new cell.
+                    IReadOnlyList<GridCoordinate> run = DashPath(grid, source, selectedTarget, dashEffect.maxDistance, battleUnits);
+                    if (run != null && run.Count > 1)
+                    {
+                        var dashMove = new PushResult(source, run);
+                        results.Add(dashMove);
+                        forecastPositions[source] = dashMove.Destination;
+                        AddFallDamage(dashMove, forecastTerrain, forecast, results);
+                    }
+
+                    continue;
+                }
+                if (effect is RecoilEffectDefinition recoil)
+                {
+                    // Parting Strike: the resonant springs back, away from where the target stood.
+                    PushResult hop = ForcedMovementCalculator.Push(grid, source, selectedTarget, forecastPositions[source],
+                        recoil.distance, coordinate => forecastPositions.Any(entry =>
+                            entry.Key != source && entry.Value == coordinate && forecast[entry.Key].Health > 0));
+                    if (hop.StepsMoved > 0)
+                    {
+                        var clean = new PushResult(source, hop.Path);
+                        results.Add(clean);
+                        forecastPositions[source] = clean.Destination;
+                        AddFallDamage(clean, forecastTerrain, forecast, results);
+                    }
+
+                    continue;
+                }
                 if (effect is CreateCloudEffectDefinition createCloud)
                 {
                     clouds.Add(PreviewCloud(createCloud.cloud, areas, grid, source, ability, selectedTarget, timelineTick));
@@ -463,10 +582,16 @@ namespace ShardsOfTheLimit.Runtime
                         if (magnet != null && modifiers != null && modifiers.stormOvercharge && rules.PreventsMovement)
                             rules = new StatusRules(rules.Id, rules.MaximumStacks, rules.Duration * 2, rules.PulseInterval,
                                 rules.DamagePerStack, rules.PreventsMovement, rules.Mechanic);
-                        forecastStatuses[target].TryGetValue(status.stableId, out var previous);
+                        // Mist Veil: any Invisibility on the panther becomes Mist.
+                        if (rules.Mechanic == StatusMechanic.Invisibility && target == source && modifiers != null && modifiers.mistVeil)
+                            rules = StealthRules.Mist;
+                        // Bleed takes 0,15 × ATK of its source; Deep Wounds lets it stack.
+                        if (rules.Mechanic == StatusMechanic.Bleed)
+                            rules = StealthRules.Bleed(rules.Id, source.Attack, rules.Duration, modifiers != null && modifiers.deepWounds);
+                        forecastStatuses[target].TryGetValue(rules.Id, out var previous);
                         var statusResult = StatusCalculator.Apply(target, rules, statusEffect.stacks,
                             timelineTick, source.Id, previous);
-                        forecastStatuses[target][status.stableId] = statusResult.State;
+                        forecastStatuses[target][rules.Id] = statusResult.State;
                         result = statusResult;
                     }
                     else result = Calculate(
@@ -481,7 +606,8 @@ namespace ShardsOfTheLimit.Runtime
                         forecastPositions[target],
                         coordinate => forecastPositions.Any(entry =>
                             entry.Key != target && entry.Value == coordinate),
-                        magnetPoint);
+                        magnetPoint,
+                        StealthBonus(target, state));
                     results.Add(result);
                     if (result is PushResult push)
                     {
@@ -497,11 +623,25 @@ namespace ShardsOfTheLimit.Runtime
                 }
             }
 
+            if (fromMist)
+            {
+                foreach (CombatUnit target in results.OfType<DamageResult>().Select(hit => hit.Target)
+                             .Where(target => target != source && forecast.TryGetValue(target, out var left) && left.Health > 0)
+                             .Distinct().ToArray())
+                {
+                    forecastStatuses[target].TryGetValue(StealthRules.VulnerabilityId, out var previous);
+                    var vulnerable = StatusCalculator.Apply(target, StealthRules.Vulnerability, 1, timelineTick, source.Id, previous);
+                    forecastStatuses[target][StealthRules.VulnerabilityId] = vulnerable.State;
+                    results.Add(vulnerable);
+                }
+            }
+
             if (apply)
             {
                 if ((clouds.Count > 0 || strikes.Count > 0 || traps.Count > 0 || magmaCells.Count > 0) && areas == null)
                     throw new InvalidOperationException("Clouds, delayed strikes, traps and Magma require battle AreaEffectWorld.");
                 CombatEffectResolver.Apply(results);
+                if (fromInvisibility || fromMist) source.RevealFromStealth();
                 foreach (var cloud in clouds) areas.Add(cloud);
                 foreach (DelayedStrike strike in strikes) areas.AddStrike(strike);
                 foreach (TrapObject trap in traps) areas.AddTrap(trap);
@@ -527,7 +667,8 @@ namespace ShardsOfTheLimit.Runtime
                 Traps = traps,
                 MagmaCells = magmaCells,
                 ChannelStage = channelStage,
-                ChannelEnded = channelEnded
+                ChannelEnded = channelEnded,
+                FromInvisibility = fromInvisibility
             };
         }
 
@@ -629,7 +770,8 @@ namespace ShardsOfTheLimit.Runtime
             GridCoordinate sourcePosition,
             GridCoordinate targetPosition,
             Func<GridCoordinate, bool> isOccupied,
-            GridCoordinate point)
+            GridCoordinate point,
+            double bonus = 1d)
         {
             switch (effect)
             {
@@ -637,7 +779,7 @@ namespace ShardsOfTheLimit.Runtime
                     return ForcedMovementCalculator.PullToPoint(grid, target, point, targetPosition, isOccupied);
                 case DamageEffectDefinition damage:
                     return CombatEffectCalculator.Damage(target, state,
-                        damage.RawDamage(source.Attack) * HitMultiplier(ability, grid, target, sourcePosition, targetPosition));
+                        damage.RawDamage(source.Attack) * HitMultiplier(ability, grid, target, sourcePosition, targetPosition) * bonus);
                 case HealEffectDefinition heal:
                     return CombatEffectCalculator.Heal(target, state, heal.Amount);
                 case GrantShieldEffectDefinition shield:

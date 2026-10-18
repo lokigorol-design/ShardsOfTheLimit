@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000003, type: 3}
+  m_Name: PartingStrike
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.AbilityDefinition
+  stableId: PartingStrike
+  displayName: Parting Strike
+  description: "Melee. A neighbouring enemy is knocked back 1 cell and the panther
+    leaps 1 cell back: 0,5 \xD7 ATK."
+  icon: {fileID: 0}
+  actionCost: 1
+  cooldown: 2
+  targetType: 1
+  targetTeam: 2
+  rangeType: 0
+  targetingPattern: {fileID: 11400000, guid: 5fa61180a13be064dbb48e6c05e01e32, type: 2}
+  impactPattern: {fileID: 11400000, guid: a5555555555555555555555555555555, type: 2}
+  effects:
+  - {fileID: 11400000, guid: 5de06208cff7fe04d944c6f3b0b17674, type: 2}
+  - {fileID: 11400000, guid: 6a8e9088b8104df4ebe942142bdbe05c, type: 2}
+  - {fileID: 11400000, guid: c65ba9ba8fc56e944bb07a9374aa2556, type: 2}
+  visualEffectPrefab: {fileID: 0}
+  sound: {fileID: 0}
+  animationKey: 

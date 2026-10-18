@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea9cc7710ca9a7e4abbfacb56b55d0d6, type: 3}
+  m_Name: Bleed
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.StatusDefinition
+  stableId: BLEED
+  icon: {fileID: 0}
+  mechanic: 9
+  maximumStacks: 1
+  durationTicks: 300
+  pulseInterval: 100
+  damagePerStack: 1
+  preventsVoluntaryMovement: 0

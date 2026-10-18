@@ -112,6 +112,7 @@ public static class ResonantBranchesSetup
             }));
 
         CreateArchon();
+        CreateMistPanther();
         AssetDatabase.SaveAssets();
         Debug.Log("[ResonantBranchesSetup] Worm abilities and branch variants of worm, toad and idol ready.");
     }
@@ -168,6 +169,90 @@ public static class ResonantBranchesSetup
             Set(unit, "movementRange", 3);
             SetArray(unit, "abilities");
         });
+    }
+
+    /// <summary>
+    /// Mist Panther (10.12), rank IV: Wide Swipe, Vanishing Step, Parting Strike, Blood Dash; branches Mist and Shadow.
+    /// No model and no icons yet (placeholder silhouette in battle).
+    /// </summary>
+    public static void CreateMistPanther()
+    {
+        var single = AssetDatabase.LoadAssetAtPath<PatternDefinition>(Root + "Patterns/SingleImpact.asset");
+        var self = AssetDatabase.LoadAssetAtPath<PatternDefinition>(Root + "Patterns/SelfTargeting.asset");
+        var adjacent = AssetDatabase.LoadAssetAtPath<PatternDefinition>(Root + "Patterns/AdjacentTargeting.asset");
+
+        var invisibility = Asset<StatusDefinition>("Statuses/Invisibility", status =>
+        {
+            status.stableId = StealthRules.InvisibilityId;
+            status.mechanic = StatusMechanic.Invisibility;
+            status.maximumStacks = 1;
+            status.durationTicks = StealthRules.DurationTicks;
+        });
+        var bleed = Asset<StatusDefinition>("Statuses/Bleed", status =>
+        {
+            status.stableId = "BLEED";
+            status.mechanic = StatusMechanic.Bleed;
+            status.maximumStacks = 1;
+            status.durationTicks = 300;
+            status.damagePerStack = 1;
+        });
+
+        var sweep = Asset<SweepEffectDefinition>("Effects/WideSwipeSweep", effect => effect.rows = 1);
+        var swipeDamage = Asset<DamageEffectDefinition>("Effects/WideSwipeDamage", effect => Set(effect, "attackMultiplier", 0.8f));
+        var vanish = Asset<ApplyStatusEffectDefinition>("Effects/VanishingStepApply", effect => { effect.status = invisibility; effect.stacks = 1; });
+        var partingDamage = Asset<DamageEffectDefinition>("Effects/PartingStrikeDamage", effect => Set(effect, "attackMultiplier", 0.5f));
+        var partingPush = Asset<PushEffectDefinition>("Effects/PartingStrikePush", effect => Set(effect, "distance", 1));
+        var partingRecoil = Asset<RecoilEffectDefinition>("Effects/PartingStrikeRecoil", effect => effect.distance = 1);
+        var dash = Asset<DashEffectDefinition>("Effects/BloodDashMove", effect => effect.maxDistance = 3);
+        var dashDamage = Asset<DamageEffectDefinition>("Effects/BloodDashDamage", effect => Set(effect, "attackMultiplier", 0.9f));
+        var dashBleed = Asset<ApplyStatusEffectDefinition>("Effects/BloodDashBleed", effect => { effect.status = bleed; effect.stacks = 1; });
+
+        var wideSwipe = Ability("WideSwipe", "Wide Swipe",
+            "Melee. Three cells in front of the panther (pick a neighbouring cell for the direction): 0,8 × ATK to everyone there.",
+            string.Empty, 1, 1, AbilityTargetType.Cell, AbilityTargetTeam.Any, AbilityRangeType.Melee, adjacent, single, sweep, swipeDamage);
+        var vanishingStep = Ability("VanishingStep", "Vanishing Step",
+            "Buff, self. Invisibility for 2 turns or until the first attack; the first attack from Invisibility deals +40%. " +
+            "With Mist Veil the panther goes into Mist instead.",
+            string.Empty, 1, 3, AbilityTargetType.Unit, AbilityTargetTeam.Allies, AbilityRangeType.Melee, self, single, vanish);
+        var partingStrike = Ability("PartingStrike", "Parting Strike",
+            "Melee. A neighbouring enemy is knocked back 1 cell and the panther leaps 1 cell back: 0,5 × ATK.",
+            string.Empty, 1, 2, AbilityTargetType.Unit, AbilityTargetTeam.Enemies, AbilityRangeType.Melee, adjacent, single,
+            partingDamage, partingPush, partingRecoil);
+        var bloodDash = Ability("BloodDash", "Blood Dash",
+            "Melee, Dash. Runs up to 3 cells straight at an enemy on one of its lines: 0,9 × ATK and Bleed.",
+            string.Empty, 1, 2, AbilityTargetType.Unit, AbilityTargetTeam.Enemies, AbilityRangeType.Melee, adjacent, single,
+            dash, dashDamage, dashBleed);
+
+        var panther = Asset<UnitDefinition>("Units/MistPanther", unit =>
+        {
+            Set(unit, "stableId", "mist-panther");
+            Set(unit, "displayName", "Mist Panther");
+            Set(unit, "maximumHealth", 80);
+            Set(unit, "maximumShield", 40);
+            Set(unit, "attack", 19);
+            Set(unit, "defense", 2);
+            Set(unit, "speed", 12);
+            Set(unit, "movementRange", 4);
+        });
+        SetArray(panther, "abilities", wideSwipe, vanishingStep, partingStrike, bloodDash);
+        SetArray(panther, "branchVariants",
+            Variant("MistPanther_Mist", "Mist Panther · Deep Wounds", v =>
+            {
+                v.mistVeil = true;
+                v.deepWounds = true;
+                v.healthMultiplier = 1.15f;
+                v.defenseMultiplier = 1.1f;
+                v.attackMultiplier = 0.9f;
+            }),
+            Variant("MistPanther_Shadow", "Shadow Panther · Silent Executioner", v =>
+            {
+                v.returnToShadow = true;
+                v.vanishingAbility = vanishingStep;
+                v.silentExecutioner = true;
+                v.attackMultiplier = 1.15f;
+                v.healthMultiplier = 0.85f;
+            }));
+        AssetDatabase.SaveAssets();
     }
 
     /// <summary>Magma Worm II: Magma Trail, HP ×1,1, ATK ×1,1, Defense ×0,9, Movement +1.</summary>

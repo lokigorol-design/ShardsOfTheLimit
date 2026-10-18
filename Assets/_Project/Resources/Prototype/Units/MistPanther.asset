@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10000000000000000000000000000004, type: 3}
+  m_Name: MistPanther
+  m_EditorClassIdentifier: ShardsOfTheLimit.Gameplay::ShardsOfTheLimit.Definitions.UnitDefinition
+  stableId: mist-panther
+  displayName: Mist Panther
+  portrait: {fileID: 0}
+  visualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 0}
+  visualRotationOffset: {x: 0, y: 0, z: 0}
+  maximumHealth: 80
+  maximumShield: 40
+  attack: 19
+  defense: 2
+  speed: 12
+  movementRange: 4
+  movementMode: 0
+  movementActionCost: 1
+  periodicResistances: []
+  abilities:
+  - {fileID: 11400000, guid: 2bfeef94873878f41ba84d19d6c79733, type: 2}
+  - {fileID: 11400000, guid: 8563dad7bb3ccab4dbfc68da1debcf7a, type: 2}
+  - {fileID: 11400000, guid: df5d5fd8fb30fdf40857a4687eadb079, type: 2}
+  - {fileID: 11400000, guid: 6cbeb430a64f95e46a7ec7b5d289ebd1, type: 2}
+  passiveModifiers: {fileID: 0}
+  branchVariants:
+  - {fileID: 11400000, guid: 4ff66b219adb10d4f9e072c51c491b06, type: 2}
+  - {fileID: 11400000, guid: 2de347eb73fc05846b15b0e9be460e8b, type: 2}

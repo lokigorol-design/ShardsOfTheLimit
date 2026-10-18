@@ -21,8 +21,9 @@ namespace ShardsOfTheLimit.Presentation
             RefreshHighlights();
             yield return new WaitForSeconds(0.5f);
 
+            // Invisible and Mist resonants are not seen by the opponent.
             CombatUnit nearestTarget = units
-                .Where(candidate => candidate.Team != unit.Team && !candidate.IsDefeated)
+                .Where(candidate => candidate.Team != unit.Team && !candidate.IsDefeated && !candidate.IsHiddenFromEnemies)
                 .OrderBy(candidate => candidate.Cell.ManhattanDistance(unit.Cell))
                 .ThenBy(candidate => candidate.CurrentHealth + candidate.CurrentShield)
                 .FirstOrDefault();

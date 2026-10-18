@@ -133,6 +133,15 @@ namespace ShardsOfTheLimit.Presentation
             {
                 source.SetCooldown(ability.StableId, ability.Cooldown);
                 feedback.AddLog($"{ability.DisplayName} cooldown set to {ability.Cooldown}");
+                // Return to Shadow: a kill from Invisibility recharges Vanishing Step at once.
+                PassiveModifierDefinition modifiers = ModifiersOf(source);
+                if (modifiers != null && modifiers.returnToShadow && modifiers.vanishingAbility != null &&
+                    resolution.FromInvisibility && resolution.Results.OfType<DamageResult>().Any(hit => hit.Defeated))
+                {
+                    source.SetCooldown(modifiers.vanishingAbility.StableId, 0);
+                    feedback.AddLog($"{source.DisplayName}: Return to Shadow — {modifiers.vanishingAbility.DisplayName} is ready again");
+                }
+
                 return;
             }
 
@@ -147,6 +156,18 @@ namespace ShardsOfTheLimit.Presentation
             foreach (CombatUnit unit in units.Where(unit => !unit.IsDefeated && resolution.ImpactCells.Contains(unit.Cell)))
                 source.Channel?.EnteredThisStage.Add(unit);
             feedback.AddLog($"{ability.DisplayName}: stage {resolution.ChannelStage}; extend next turn for {channel.extendCost} AP");
+        }
+
+        /// <summary>Bleed hits taken when units spent AP since the last frame.</summary>
+        private void PresentBleedHits()
+        {
+            var hits = new List<ICombatEffectResult>();
+            foreach (CombatUnit unit in units) hits.AddRange(unit.TakeBleedHits());
+            foreach (ReserveSlot slot in reserve) slot.Unit.TakeBleedHits();
+            if (hits.Count == 0) return;
+            foreach (ICombatEffectResult hit in hits) feedback.AddLog($"Кровотечение: {hit.Target.DisplayName}");
+            PresentTimelineResults(hits);
+            if (hits.Any(hit => hit.Target.IsDefeated)) EvaluateBattleEnd();
         }
 
         /// <summary>End of an activation: Banked Heat, and a channel that was not extended this turn goes out.</summary>
@@ -238,9 +259,13 @@ namespace ShardsOfTheLimit.Presentation
         private void EmitResonantMarks()
         {
             if (areaEffects == null) return;
+            PresentBleedHits();
             magmaMarkBudget += Time.deltaTime * 10f;
             if (magmaMarkBudget < 1f) return;
             magmaMarkBudget -= 1f;
+            foreach (CombatUnit hidden in units.Where(unit => !unit.IsDefeated && unit.IsHiddenFromEnemies))
+                if (unitViews.TryGetValue(hidden, out CombatUnitView hiddenView))
+                    AbilityVfx.StealthMark(hiddenView.transform.position, hidden.IsInMist);
             foreach (MagmaCell hot in areaEffects.Magma) AbilityVfx.MagmaMark(EffectWorldPosition(hot.Cell));
             foreach (CombatUnit owner in units.Where(owner => !owner.IsDefeated && owner.Channel != null))
                 foreach (GridCoordinate cell in ConePattern.Cells(grid, owner.Cell, owner.Channel.Direction, owner.Channel.Stage))

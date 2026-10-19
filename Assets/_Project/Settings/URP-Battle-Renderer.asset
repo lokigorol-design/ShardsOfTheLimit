@@ -52,7 +52,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 0}
   m_RendererFeatures:
   - {fileID: -1011095032966728989}
-  m_RendererFeatureMap: e332dbad6cdef7f1
+  - {fileID: 6923417590524980829}
+  m_RendererFeatureMap: e332dbad6cdef7f15daeeee29deb1460
   postProcessData: {fileID: 0}
   m_AssetVersion: 3
   m_PrepassLayerMask:
@@ -80,3 +81,23 @@ MonoBehaviour:
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
   m_TileOnlyMode: 0
+--- !u!114 &6923417590524980829
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b00045f12942b46c698459096c89274e, type: 3}
+  m_Name: ComicPost
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FullScreenPassRendererFeature
+  m_Active: 1
+  injectionPoint: 600
+  fetchColorBuffer: 1
+  requirements: 3
+  passMaterial: {fileID: 2100000, guid: 91ff314978ee6e14d9fa75b63004156f, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1

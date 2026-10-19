@@ -183,6 +183,7 @@ namespace ShardsOfTheLimit.Presentation
             LoadDefinitions();
             BuildGrid();
             ConfigureCameraAndLight();
+            ApplyComicLook();
             feedback = gameObject.AddComponent<BattleFeedbackView>();
             LoadStatusIcons();
 
@@ -201,6 +202,7 @@ namespace ShardsOfTheLimit.Presentation
                 return;
             }
 
+            if (Input.GetKeyDown(KeyCode.F2)) ToggleComicLook();
             UpdateCameraControls();
             EmitFieldMarks();
             EmitResonantMarks();
@@ -260,6 +262,25 @@ namespace ShardsOfTheLimit.Presentation
             if (Input.GetKeyDown(KeyCode.B)) CycleBranchVariant();
 
             UpdatePointer();
+        }
+
+        /// <summary>Comic-book rendering (Shards/ComicPost full-screen pass); F2 switches it off to compare.</summary>
+        public static bool ComicLook { get; private set; } = true;
+
+        private static readonly int ComicStrengthId = Shader.PropertyToID("_ComicStrength");
+
+        public static void SetComicLook(bool enabled)
+        {
+            ComicLook = enabled;
+            Shader.SetGlobalFloat(ComicStrengthId, enabled ? 1f : 0f);
+        }
+
+        private static void ApplyComicLook() => SetComicLook(ComicLook);
+
+        private void ToggleComicLook()
+        {
+            SetComicLook(!ComicLook);
+            status = ComicLook ? "Комиксовая отрисовка включена (F2)." : "Обычная отрисовка (F2 — вернуть комикс).";
         }
 
         private float fieldMarkBudget;

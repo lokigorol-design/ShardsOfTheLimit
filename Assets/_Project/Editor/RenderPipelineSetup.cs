@@ -105,6 +105,63 @@ public static class RenderPipelineSetup
         EditorUtility.SetDirty(rendererData);
     }
 
+    private const string ComicMaterialPath = "Assets/_Project/Art/Shaders/ComicPost.mat";
+
+    /// <summary>
+    /// Adds the comic-book full-screen pass (Shards/ComicPost) to the battle renderer. Run explicitly:
+    /// Unity -batchmode -projectPath ... -executeMethod RenderPipelineSetup.AddComicPass -quit
+    /// Safe to run again: an existing "ComicPost" feature is reused.
+    /// </summary>
+    public static void AddComicPass()
+    {
+        var rendererData = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
+        if (rendererData == null)
+        {
+            Debug.LogError("[RenderPipelineSetup] Renderer asset not found; run Configure first.");
+            return;
+        }
+
+        var material = AssetDatabase.LoadAssetAtPath<Material>(ComicMaterialPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Shards/ComicPost")) { name = "ComicPost" };
+            AssetDatabase.CreateAsset(material, ComicMaterialPath);
+        }
+
+        var feature = rendererData.rendererFeatures.Find(existing => existing != null && existing.name == "ComicPost")
+            as FullScreenPassRendererFeature;
+        if (feature == null)
+        {
+            feature = ScriptableObject.CreateInstance<FullScreenPassRendererFeature>();
+            feature.name = "ComicPost";
+            AssetDatabase.AddObjectToAsset(feature, rendererData);
+            var serialized = new SerializedObject(rendererData);
+            SerializedProperty features = serialized.FindProperty("m_RendererFeatures");
+            features.arraySize++;
+            features.GetArrayElementAtIndex(features.arraySize - 1).objectReferenceValue = feature;
+            SerializedProperty map = serialized.FindProperty("m_RendererFeatureMap");
+            if (map != null)
+            {
+                map.arraySize++;
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out string _, out long localId);
+                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        feature.injectionPoint = FullScreenPassRendererFeature.InjectionPoint.AfterRenderingPostProcessing;
+        feature.fetchColorBuffer = true;
+        feature.requirements = ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal;
+        feature.passMaterial = material;
+        feature.passIndex = 0;
+        feature.SetActive(true);
+        EditorUtility.SetDirty(feature);
+        EditorUtility.SetDirty(rendererData);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[RenderPipelineSetup] Comic pass configured.");
+    }
+
     private static void CreatePostProcessProfile()
     {
         if (AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath) != null) return;

@@ -24,6 +24,8 @@ namespace ShardsOfTheLimit.Tests
             yield return null;
             yield return null;
             var controller = Object.FindAnyObjectByType<BattlePrototypeController>();
+            yield return new WaitForSeconds(0.3f);
+            yield return Capture("39-onboarding.png");
             controller.GetType().GetMethod("CloseOnboarding", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
 
             yield return PassTurnsUntil(controller, unit => unit.DefinitionId == "primal-idol");
@@ -48,6 +50,14 @@ namespace ShardsOfTheLimit.Tests
                 .Select(name => IconTintCache.Get(swipe, Resources.Load<ResonantPalette>("Prototype/Palettes/" + name))).ToArray();
             Assert.That(variants.All(texture => texture != null && texture.width == 256), Is.True);
             SaveRow(variants, "Logs/Screenshots/43-wide-swipe-mist-fire-earth-neutral.png");
+
+            // Result screen.
+            CombatUnit[] opponents = controller.Units.Where(unit => unit.Team == Team.Opponent).ToArray();
+            DamageResolver.Apply(opponents, opponents.Select(unit => unit.Cell).ToArray(), int.MaxValue);
+            controller.RequestEndTurn();
+            controller.RequestEndTurn();
+            yield return new WaitForSeconds(0.6f);
+            yield return Capture("44-victory.png");
             LogAssert.NoUnexpectedReceived();
         }
 

@@ -36,7 +36,8 @@ namespace ShardsOfTheLimit.Presentation
                 wordWrap = true,
                 alignment = TextAnchor.UpperLeft
             };
-            onboardingBodyStyle.normal.textColor = new Color(0.9f, 0.94f, 1f);
+            onboardingBodyStyle.normal.textColor = ComicUi.Ink;
+            onboardingTitleStyle.normal.textColor = ComicUi.Ink;
             resultTitleStyle = new GUIStyle(onboardingTitleStyle) { fontSize = 30 };
         }
 
@@ -117,9 +118,7 @@ namespace ShardsOfTheLimit.Presentation
             float width = Mathf.Min(660f, Screen.width - 80f);
             float height = 330f;
             var panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-            GUI.color = new Color(0.05f, 0.06f, 0.08f, 0.94f);
-            GUI.DrawTexture(panel, Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            ComicUi.Panel(panel, ComicUi.Paper, true, 7f);
             string title;
             string body;
             switch (onboardingPage)
@@ -148,11 +147,14 @@ namespace ShardsOfTheLimit.Presentation
                     break;
             }
 
-            GUI.Label(new Rect(panel.x + 24f, panel.y + 20f, panel.width - 48f, 42f), title, onboardingTitleStyle);
-            GUI.Label(new Rect(panel.x + 34f, panel.y + 74f, panel.width - 68f, 190f), body, onboardingBodyStyle);
-            if (GUI.Button(new Rect(panel.x + 34f, panel.yMax - 58f, 140f, 34f), "Пропустить (Esc)")) CloseOnboarding();
-            string next = onboardingPage < 2 ? "Далее (Enter)" : "В бой";
-            if (GUI.Button(new Rect(panel.xMax - 174f, panel.yMax - 58f, 140f, 34f), next)) AdvanceOnboarding();
+            ComicUi.Caption(new Rect(panel.x + 24f, panel.y - 18f, Mathf.Min(panel.width - 48f, 60f + title.Length * 13f), 38f),
+                title, ComicUi.Yellow, -2.5f, 20);
+            GUI.Label(new Rect(panel.x + 34f, panel.y + 44f, panel.width - 68f, 210f), body, onboardingBodyStyle);
+            if (ComicUi.Button(new Rect(panel.x + 34f, panel.yMax - 58f, 150f, 36f), "Пропустить (Esc)", hudButtonStyle, true))
+                CloseOnboarding();
+            string next = onboardingPage < 2 ? "Далее (Enter)" : "В БОЙ!";
+            if (ComicUi.Button(new Rect(panel.xMax - 184f, panel.yMax - 58f, 150f, 36f), next, hudButtonStyle, true, false, ComicUi.Yellow))
+                AdvanceOnboarding();
         }
         private void AdvanceOnboarding()
         {
@@ -176,21 +178,21 @@ namespace ShardsOfTheLimit.Presentation
         {
             float width = 440f;
             float height = 250f;
-            var panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
-            GUI.Box(panel, string.Empty);
+            var panel = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f + 40f, width, height);
+            ComicUi.Panel(panel, ComicUi.Paper, true, 7f);
             bool victory = outcome == BattleOutcome.PlayerVictory;
-            Color previous = GUI.color;
-            GUI.color = victory ? new Color(0.35f, 1f, 0.48f) : new Color(1f, 0.32f, 0.25f);
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 24f, panel.width - 40f, 48f),
-                victory ? "VICTORY" : "DEFEAT", resultTitleStyle);
-            GUI.color = previous;
-            GUI.Label(new Rect(panel.x + 36f, panel.y + 84f, panel.width - 72f, 66f),
-                $"Timeline tick {turns.CurrentTick} · Actions resolved: {resolvedActions}\n" +
-                $"Battle time: {Time.unscaledTime - battleStartedAt:0.0}s · player turn avg {AveragePlayerTurnSeconds:0.0}s" +
-                (LastReportPath != null ? $"\nReport: Playtests/{System.IO.Path.GetFileName(LastReportPath)}" : string.Empty),
+            var burst = new Rect(panel.center.x - 190f, panel.y - 120f, 380f, 170f);
+            ComicUi.Burst(burst, victory ? ComicUi.Yellow : ComicUi.Red);
+            ComicUi.OutlinedText(new Rect(burst.x, burst.y + 40f, burst.width, 60f), victory ? "ПОБЕДА!" : "ПОРАЖЕНИЕ!",
+                resultTitleStyle, victory ? Color.white : ComicUi.Yellow, null, 3f);
+            GUI.Label(new Rect(panel.x + 36f, panel.y + 70f, panel.width - 72f, 80f),
+                $"Тик {turns.CurrentTick} · действий: {resolvedActions}\n" +
+                $"Бой длился {Time.unscaledTime - battleStartedAt:0} с · средний ход игрока {AveragePlayerTurnSeconds:0.0} с" +
+                (LastReportPath != null ? $"\nОтчёт: Playtests/{System.IO.Path.GetFileName(LastReportPath)}" : string.Empty),
                 onboardingBodyStyle);
-            if (GUI.Button(new Rect(panel.x + 52f, panel.yMax - 64f, 144f, 38f), "Retry")) Restart();
-            if (GUI.Button(new Rect(panel.xMax - 196f, panel.yMax - 64f, 144f, 38f), "Exit")) ExitPrototype();
+            if (ComicUi.Button(new Rect(panel.x + 52f, panel.yMax - 64f, 144f, 40f), "ЕЩЁ РАЗ!", hudButtonStyle, true, false, ComicUi.Yellow))
+                Restart();
+            if (ComicUi.Button(new Rect(panel.xMax - 196f, panel.yMax - 64f, 144f, 40f), "Выход", hudButtonStyle, true)) ExitPrototype();
         }
 
         private static void ExitPrototype()
@@ -212,7 +214,7 @@ namespace ShardsOfTheLimit.Presentation
 
             if (movementCostStyle == null)
             {
-                movementCostStyle = new GUIStyle(GUI.skin.box)
+                movementCostStyle = new GUIStyle(GUI.skin.label)
                 {
                     fontSize = 13,
                     fontStyle = FontStyle.Bold,
@@ -226,10 +228,10 @@ namespace ShardsOfTheLimit.Presentation
                 Vector3 screen = battleCamera.WorldToScreenPoint(
                     EffectWorldPosition(entry.Key) + Vector3.up * 0.42f);
                 if (screen.z <= 0f) continue;
-                GUI.Box(
-                    new Rect(screen.x - 16f, Screen.height - screen.y - 12f, 32f, 24f),
-                    entry.Value.ToString(),
-                    movementCostStyle);
+                var tag = new Rect(screen.x - 13f, Screen.height - screen.y - 12f, 26f, 24f);
+                ComicUi.Panel(tag, ComicUi.Paper, false, 2f);
+                movementCostStyle.normal.textColor = ComicUi.Ink;
+                GUI.Label(tag, entry.Value.ToString(), movementCostStyle);
             }
         }
 
@@ -242,7 +244,7 @@ namespace ShardsOfTheLimit.Presentation
 
             if (abilityPreviewStyle == null)
             {
-                abilityPreviewStyle = new GUIStyle(GUI.skin.box)
+                abilityPreviewStyle = new GUIStyle(GUI.skin.label)
                 {
                     fontSize = 13,
                     fontStyle = FontStyle.Bold,
@@ -261,12 +263,13 @@ namespace ShardsOfTheLimit.Presentation
                 if (selectedUnit != null && group.Key != selectedUnit && group.Any(result => result.Kind == CombatEffectKind.Damage))
                 {
                     AttackSide side = FacingRules.GetSide(group.Key, selectedUnit.Cell);
-                    if (side != AttackSide.Front) label += side == AttackSide.Back ? "  В СПИНУ" : "  В БОК";
+                    if (side != AttackSide.Front) label += side == AttackSide.Back ? "  В СПИНУ!" : "  В БОК!";
                 }
-                GUI.Box(
-                    new Rect(screen.x - 100f, Screen.height - screen.y - 14f, 200f, 28f),
-                    label,
-                    abilityPreviewStyle);
+                abilityPreviewStyle.normal.textColor = ComicUi.Ink;
+                float labelWidth = Mathf.Min(320f, abilityPreviewStyle.CalcSize(new GUIContent(label)).x + 20f);
+                var bubble = new Rect(screen.x - labelWidth * 0.5f, Screen.height - screen.y - 16f, labelWidth, 28f);
+                ComicUi.Panel(bubble, group.Key.Team == selectedUnit?.Team ? new Color(1f, 0.8f, 0.7f, 0.97f) : ComicUi.Paper, false, 3f);
+                GUI.Label(bubble, label, abilityPreviewStyle);
             }
 
             foreach (TerrainChangeResult terrainResult in abilityPreview.TerrainResults)
@@ -274,10 +277,10 @@ namespace ShardsOfTheLimit.Presentation
                 Vector3 screen = battleCamera.WorldToScreenPoint(
                     EffectWorldPosition(terrainResult.Coordinate) + Vector3.up * 0.42f);
                 if (screen.z <= 0f) continue;
-                GUI.Box(
-                    new Rect(screen.x - 54f, Screen.height - screen.y - 14f, 108f, 28f),
-                    $"H {terrainResult.PreviousHeight}→{terrainResult.NewHeight}",
-                    abilityPreviewStyle);
+                var heightTag = new Rect(screen.x - 50f, Screen.height - screen.y - 14f, 100f, 28f);
+                ComicUi.Panel(heightTag, ComicUi.Yellow, false, 3f);
+                abilityPreviewStyle.normal.textColor = ComicUi.Ink;
+                GUI.Label(heightTag, $"H {terrainResult.PreviousHeight}→{terrainResult.NewHeight}", abilityPreviewStyle);
             }
         }
 

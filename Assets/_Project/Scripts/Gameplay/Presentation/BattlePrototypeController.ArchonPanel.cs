@@ -55,7 +55,7 @@ namespace ShardsOfTheLimit.Presentation
             float height = 34f + slots * (ArchonIconSize + 24f);
             var panel = new Rect(Screen.width - ArchonIconSize - 40f, (Screen.height - height) * 0.5f + 20f, ArchonIconSize + 28f, height);
             Panel(panel);
-            GUI.Label(new Rect(panel.x, panel.y + 6f, panel.width, 20f), "Архонт", hudTitleStyle.Center());
+            ComicUi.Caption(new Rect(panel.x - 2f, panel.y - 12f, panel.width + 4f, 26f), "Архонт", ComicUi.Yellow, 3f, 14);
             float x = panel.x + 14f;
             float y = panel.y + 32f;
 
@@ -98,8 +98,8 @@ namespace ShardsOfTheLimit.Presentation
                 float tipHeight = hudTextStyle.CalcHeight(new GUIContent(archonTooltipBody), width - 24f) + 42f;
                 var tip = new Rect(panel.x - width - 10f, Mathf.Clamp(Event.current.mousePosition.y - 20f, 12f, Screen.height - tipHeight - 12f),
                     width, tipHeight);
-                Panel(tip, false);
-                GUI.Label(new Rect(tip.x + 12f, tip.y + 8f, tip.width - 24f, 24f), archonTooltipTitle, hudTitleStyle);
+                ComicUi.Bubble(tip, false);
+                GUI.Label(new Rect(tip.x + 12f, tip.y + 8f, tip.width - 24f, 24f), archonTooltipTitle.ToUpperInvariant(), hudTitleStyle);
                 GUI.Label(new Rect(tip.x + 12f, tip.y + 36f, tip.width - 24f, tipHeight - 40f), archonTooltipBody, hudTextStyle);
             }
         }
@@ -127,11 +127,11 @@ namespace ShardsOfTheLimit.Presentation
             GUI.color = enabled ? new Color(1f, 0.85f, 0.4f) : new Color(0.45f, 0.42f, 0.36f);
             GUI.DrawTexture(rect, archonRing);
             GUI.color = previous;
-            if (state == null) GUI.Label(rect, label, hudTitleStyle.Center());
+            if (state == null) ComicUi.OutlinedText(rect, label, hudShoutStyle, Color.white);
             else
             {
-                GUI.Label(new Rect(rect.x, rect.y + 8f, rect.width, rect.height * 0.45f), label, hudTitleStyle.Center());
-                GUI.Label(new Rect(rect.x, rect.y + rect.height * 0.52f, rect.width, 16f), state, hudBadgeStyle);
+                ComicUi.OutlinedText(new Rect(rect.x, rect.y + 8f, rect.width, rect.height * 0.45f), label, hudShoutStyle, Color.white);
+                ComicUi.OutlinedText(new Rect(rect.x, rect.y + rect.height * 0.52f, rect.width, 16f), state, hudBadgeStyle, ComicUi.Yellow, null, 1.5f);
             }
             if (hotkey != null)
             {

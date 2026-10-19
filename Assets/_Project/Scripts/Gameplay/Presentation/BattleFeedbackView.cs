@@ -44,7 +44,7 @@ namespace ShardsOfTheLimit.Presentation
             get
             {
                 float width = Mathf.Min(360f, Screen.width * 0.3f);
-                return new Rect(Screen.width - width - 12f, 12f, width, 170f);
+                return new Rect(Screen.width - width - 14f, 24f, width, 170f);
             }
         }
 
@@ -313,7 +313,7 @@ namespace ShardsOfTheLimit.Presentation
                 wordWrap = true,
                 alignment = TextAnchor.UpperLeft
             };
-            logStyle.normal.textColor = new Color(0.9f, 0.93f, 1f);
+            logStyle.normal.textColor = ComicUi.Ink;
             bannerStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize = 26,
@@ -322,7 +322,7 @@ namespace ShardsOfTheLimit.Presentation
             };
             floatingStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 18,
+                fontSize = 20,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };
@@ -330,27 +330,33 @@ namespace ShardsOfTheLimit.Presentation
 
         private void DrawLog()
         {
+            // Comic narration box: paper panel with a tilted caption.
             Rect box = LogRect;
-            Color previous = GUI.color;
-            GUI.color = new Color(0.05f, 0.06f, 0.08f, 0.82f);
-            GUI.DrawTexture(box, Texture2D.whiteTexture);
-            GUI.color = new Color(0.85f, 0.72f, 0.45f, 0.55f);
-            GUI.DrawTexture(new Rect(box.x, box.y, box.width, 1f), Texture2D.whiteTexture);
-            GUI.color = previous;
-            GUI.Label(new Rect(box.x + 10f, box.y + 3f, box.width - 20f, 20f), "Журнал боя", logStyle);
+            ComicUi.Panel(box, ComicUi.Paper);
+            ComicUi.Caption(new Rect(box.x + 10f, box.y - 13f, 130f, 24f), "Журнал боя", ComicUi.Yellow, 2f, 13);
             string text = string.Join("\n", logEntries.Select(entry => $"› {entry}"));
-            GUI.Label(new Rect(box.x + 12f, box.y + 25f, box.width - 24f, box.height - 32f), text, logStyle);
+            GUI.Label(new Rect(box.x + 12f, box.y + 16f, box.width - 24f, box.height - 22f), text, logStyle);
         }
 
         private void DrawBanner()
         {
             float elapsed = Time.unscaledTime - bannerStartedAt;
             if (string.IsNullOrEmpty(bannerText) || elapsed >= bannerDuration) return;
-            float alpha = Mathf.Min(1f, elapsed / 0.15f, (bannerDuration - elapsed) / 0.25f);
+            // Comic shout: a starburst pops in, the lettering sits on a tilted caption over it.
+            float alpha = Mathf.Min(1f, elapsed / 0.12f, (bannerDuration - elapsed) / 0.25f);
+            float pop = 1f + 0.18f * Mathf.Clamp01(1f - elapsed / 0.18f);
+            var center = new Vector2(Screen.width * 0.5f, 196f);
+            var burst = new Rect(center.x - 150f * pop, center.y - 62f * pop, 300f * pop, 124f * pop);
+            ComicUi.Burst(burst, ComicUi.Yellow, alpha);
+            var caption = new Rect(center.x - 230f, center.y - 24f, 460f, 48f);
             Color previous = GUI.color;
-            GUI.color = new Color(bannerColor.r, bannerColor.g, bannerColor.b, alpha);
-            GUI.Box(new Rect(Screen.width * 0.5f - 230f, 164f, 460f, 52f), string.Empty);
-            GUI.Label(new Rect(Screen.width * 0.5f - 225f, 166f, 450f, 48f), bannerText, bannerStyle);
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(-3f, caption.center);
+            ComicUi.Panel(caption, new Color(bannerColor.r * 0.85f, bannerColor.g * 0.85f, bannerColor.b * 0.85f, alpha), false, 4f);
+            ComicUi.OutlinedText(caption, bannerText.ToUpperInvariant(), bannerStyle, new Color(1f, 1f, 1f, alpha),
+                new Color(ComicUi.Ink.r, ComicUi.Ink.g, ComicUi.Ink.b, alpha), 2.5f);
+            GUI.matrix = matrix;
             GUI.color = previous;
         }
 
@@ -372,10 +378,13 @@ namespace ShardsOfTheLimit.Presentation
 
                 Vector3 screen = camera.WorldToScreenPoint(entry.WorldPosition + Vector3.up * progress * 0.65f);
                 if (screen.z <= 0f) continue;
-                Color previous = GUI.color;
-                GUI.color = new Color(entry.Color.r, entry.Color.g, entry.Color.b, 1f - progress);
-                GUI.Label(new Rect(screen.x - 75f, Screen.height - screen.y - 18f, 150f, 36f), entry.Text, floatingStyle);
-                GUI.color = previous;
+                // Comic lettering: pops in large, ink-outlined, fades at the end.
+                float fade = Mathf.Clamp01((1f - progress) / 0.35f);
+                float pop = 1f + 0.35f * Mathf.Clamp01(1f - progress / 0.12f);
+                floatingStyle.fontSize = Mathf.RoundToInt(20f * pop);
+                var rect = new Rect(screen.x - 90f, Screen.height - screen.y - 20f, 180f, 40f);
+                ComicUi.OutlinedText(rect, entry.Text, floatingStyle, new Color(entry.Color.r, entry.Color.g, entry.Color.b, fade),
+                    new Color(ComicUi.Ink.r, ComicUi.Ink.g, ComicUi.Ink.b, fade), 2.5f);
             }
         }
     }

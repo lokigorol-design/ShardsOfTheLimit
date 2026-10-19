@@ -83,7 +83,9 @@ namespace ShardsOfTheLimit.Presentation
         private void DrawCloudInformation()
         {
             if (areaEffects == null || battleCamera == null) return;
-            var labelStyle = new GUIStyle(GUI.skin.box) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
+            var labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            labelStyle.normal.textColor = ComicUi.Ink;
+            var infoStyle = new GUIStyle(labelStyle) { alignment = TextAnchor.UpperLeft, fontStyle = FontStyle.Normal, wordWrap = true };
             // Unit statuses are shown as icons on the unit plates (Hud partial).
 
             var displayedClouds = areaEffects.Clouds.Concat(abilityPreview?.Clouds ?? System.Array.Empty<CloudAreaEffect>());
@@ -101,7 +103,9 @@ namespace ShardsOfTheLimit.Presentation
                 Vector3 end = battleCamera.WorldToScreenPoint(position + direction * 0.6f);
                 string arrow = Mathf.Abs(end.x - screen.x) > Mathf.Abs(end.y - screen.y)
                     ? (end.x > screen.x ? "→" : "←") : (end.y > screen.y ? "↑" : "↓");
-                GUI.Box(rect, $"{cloud.Rules.Status.Id.Substring(0, System.Math.Min(4, cloud.Rules.Status.Id.Length))} {arrow}", labelStyle);
+                // Cloud tag: a small green-tinted comic label with the drift arrow.
+                ComicUi.Panel(rect, new Color(0.82f, 0.95f, 0.75f, 0.95f), false, 2f);
+                GUI.Label(rect, $"{cloud.Rules.Status.Id.Substring(0, System.Math.Min(4, cloud.Rules.Status.Id.Length))} {arrow}", labelStyle);
                 bool hover = rect.Contains(Event.current.mousePosition);
                 Ray ray = battleCamera.ScreenPointToRay(Input.mousePosition);
                 var plane = new Plane(Vector3.up, new Vector3(0, position.y, 0));
@@ -118,7 +122,9 @@ namespace ShardsOfTheLimit.Presentation
                         $"Direction {cloud.MovementDirection} · speed {cloud.Rules.MovementSpeed}/{cloud.Rules.MovementInterval}t\n" +
                         $"Z [{cloud.LowerHeight}, {cloud.LowerHeight + cloud.Rules.VerticalHeight})\n" +
                         "Next: " + string.Join(" ", cloud.PredictMovement(grid));
-                    GUI.Box(new Rect(Mathf.Min(rect.x, Screen.width - 360), rect.y + 25, 350, 100), info, labelStyle);
+                    var infoRect = new Rect(Mathf.Min(rect.x, Screen.width - 360), rect.y + 34, 350, 100);
+                    ComicUi.Bubble(infoRect, false);
+                    GUI.Label(new Rect(infoRect.x + 10f, infoRect.y + 6f, infoRect.width - 20f, infoRect.height - 10f), info, infoStyle);
                 }
             }
         }

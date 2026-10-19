@@ -125,7 +125,7 @@ namespace ShardsOfTheLimit.Presentation
             Color teamColor = unit.Team == Team.Player
                 ? new Color(0.35f, 0.75f, 1f)
                 : new Color(1f, 0.4f, 0.28f);
-            feedback.ShowTurnBanner($"TICK {turns.CurrentTick} · {unit.DisplayName}", teamColor);
+            feedback.ShowTurnBanner($"Ходит {unit.DisplayName}!", teamColor);
             feedback.AddLog(
                 $"Tick {turns.CurrentTick}: {unit.DisplayName} activation #{unit.ActivationCount} ({unit.CurrentActionPoints} AP)");
             if (definitionsByUnit.TryGetValue(unit, out UnitDefinition definition))

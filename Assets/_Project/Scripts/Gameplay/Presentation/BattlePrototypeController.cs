@@ -742,7 +742,7 @@ namespace ShardsOfTheLimit.Presentation
             feedback.AddLog(
                 $"Battle finished at tick {turns.CurrentTick}, {resolvedActions} resolved actions, " +
                 $"{Time.unscaledTime - battleStartedAt:0.0}s");
-            feedback.ShowTurnBanner(playerWon ? "VICTORY" : "DEFEAT", playerWon ? Color.green : Color.red, 2f);
+            // The result screen shouts the outcome; no separate banner.
             RefreshHighlights();
             return true;
         }

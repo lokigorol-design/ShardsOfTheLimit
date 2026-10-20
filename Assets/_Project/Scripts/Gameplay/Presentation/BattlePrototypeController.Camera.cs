@@ -67,7 +67,7 @@ namespace ShardsOfTheLimit.Presentation
             battleCamera.orthographic = false;
             battleCamera.fieldOfView = CameraFieldOfView;
             battleCamera.nearClipPlane = 0.3f;
-            battleCamera.farClipPlane = 150f;
+            battleCamera.farClipPlane = 400f;
             cameraZoom = DefaultCameraZoom;
             targetCameraZoom = DefaultCameraZoom;
             cameraPitch = DefaultCameraPitch;

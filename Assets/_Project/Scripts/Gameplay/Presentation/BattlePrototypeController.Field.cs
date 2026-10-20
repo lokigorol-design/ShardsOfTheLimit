@@ -42,10 +42,8 @@ namespace ShardsOfTheLimit.Presentation
                     columnCenterY,
                     WorldZ(cell.Coordinate.Y));
                 block.transform.localScale = new Vector3(0.98f, columnHeight, 0.98f);
-                Material stone = BattleEnvironment.CreateCellMaterial(cell.IsWalkable);
-                // Offset each column's stone so neighbouring tiles do not repeat the same pattern.
-                stone.mainTextureOffset = new Vector2((cell.Coordinate.X * 0.37f) % 1f, (cell.Coordinate.Y * 0.61f) % 1f);
-                block.GetComponent<Renderer>().material = stone;
+                // Printed cardboard tile; every face shows the inked cut edge, so no texture offset per cell.
+                block.GetComponent<Renderer>().material = BattleEnvironment.CreateCellMaterial(cell.IsWalkable);
                 Color baseColor = GetCellBaseColor(cell);
                 CellView view = block.AddComponent<CellView>();
                 view.Initialize(cell.Coordinate, baseColor);
@@ -53,8 +51,8 @@ namespace ShardsOfTheLimit.Presentation
                 if (!cell.IsWalkable) CreateObstacleRocks(cell);
             }
 
-            BattleEnvironment.CreateGround(transform, -0.62f);
-            CreateBorderBoulders();
+            // The field is a board game laid out on a kitchen table (see BattleTabletop).
+            BattleTabletop.Build(transform, -0.62f, GridWidth * CellSpacing * 0.5f);
         }
 
         /// <summary>Obstacles read as rock formations: one large rock with a couple of smaller ones around it.</summary>
@@ -65,9 +63,12 @@ namespace ShardsOfTheLimit.Presentation
             obstacle.transform.SetParent(transform, false);
             obstacle.transform.position = new Vector3(
                 WorldX(cell.Coordinate.X),
-                cell.Height * HeightStep + 0.02f,
+                cell.Height * HeightStep + BattleTabletop.BaseHeight + 0.02f,
                 WorldZ(cell.Coordinate.Y));
             obstacle.transform.rotation = Quaternion.Euler(0f, seed % 360, 0f);
+            // Terrain piece: the rocks are glued onto a wooden token like a miniature.
+            BattleTabletop.CreateToken(obstacle.transform,
+                new Vector3(obstacle.transform.position.x, cell.Height * HeightStep + BattleTabletop.BaseHeight, obstacle.transform.position.z), 0.47f);
             obstacle.AddComponent<MeshFilter>().sharedMesh = BattleEnvironment.CreateRockMesh(seed, 0.4f, 0.75f);
             obstacle.AddComponent<MeshRenderer>().sharedMaterial = BattleEnvironment.RockMaterial;
             for (int index = 0; index < 2; index++)
@@ -79,21 +80,6 @@ namespace ShardsOfTheLimit.Presentation
             }
 
             obstacle.AddComponent<ObstacleView>().Initialize(cell.Coordinate);
-        }
-
-        /// <summary>Boulders on the ground around the plateau so the field does not float in a void.</summary>
-        private void CreateBorderBoulders()
-        {
-            var random = new System.Random(7);
-            float half = GridWidth * CellSpacing * 0.5f;
-            for (int index = 0; index < 26; index++)
-            {
-                float angle = (float)(random.NextDouble() * Math.PI * 2);
-                float distance = half + 0.9f + (float)random.NextDouble() * 5f;
-                var position = new Vector3(Mathf.Cos(angle) * distance, -0.64f, Mathf.Sin(angle) * distance);
-                float size = 0.25f + (float)random.NextDouble() * 0.6f;
-                BattleEnvironment.CreateRock(transform, position, 500 + index, size, size * 0.7f).name = "Border Boulder";
-            }
         }
 
         private Vector3 UnitWorldPosition(GridCoordinate coordinate)

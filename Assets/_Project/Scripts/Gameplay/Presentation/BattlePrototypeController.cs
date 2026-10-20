@@ -411,10 +411,13 @@ namespace ShardsOfTheLimit.Presentation
             body.transform.position = UnitWorldPosition(unit.Cell);
             body.transform.rotation = Quaternion.LookRotation(new Vector3(unit.Facing.X, 0f, unit.Facing.Y));
             body.transform.localScale = Vector3.one;
+            // Miniature on a round base: the model stands on top of it.
+            foreach (Transform child in body.transform) child.localPosition += Vector3.up * BattleTabletop.BaseHeight;
             CombatUnitView view = body.AddComponent<CombatUnitView>();
             view.Initialize(unit, fallbackColor);
-            // Procedural animation test; captures the model before the aura and the facing wedge are added.
+            // Procedural animation test; captures the model before the base, the aura and the facing wedge are added.
             body.AddComponent<ProceduralAnimator>().Initialize(definition.StableId == "primal-idol" ? 0.08f : 0f);
+            BattleTabletop.CreateFigureBase(body.transform, -0.62f + BattleTabletop.BaseHeight, 0.44f, team == Team.Player);
             body.AddComponent<StatusAuraView>().Initialize(unit);
             CreateFacingWedge(body.transform, team);
             unitViews[unit] = view;
@@ -429,7 +432,7 @@ namespace ShardsOfTheLimit.Presentation
             if (facingWedgeMaterial == null) facingWedgeMaterial = new Material(Shader.Find("Sprites/Default")) { name = "Facing Wedge" };
             var wedge = new GameObject("Facing Wedge");
             wedge.transform.SetParent(unitRoot, false);
-            wedge.transform.localPosition = new Vector3(0f, -0.58f, 0.36f);
+            wedge.transform.localPosition = new Vector3(0f, -0.61f + BattleTabletop.BaseHeight, 0.36f);
             Color color = team == Team.Player ? new Color(0.35f, 0.75f, 1f, 0.85f) : new Color(1f, 0.38f, 0.28f, 0.85f);
             var mesh = new Mesh { name = "Facing Wedge" };
             mesh.vertices = new[] { new Vector3(0f, 0f, 0.2f), new Vector3(0.17f, 0f, -0.02f), new Vector3(-0.17f, 0f, -0.02f) };

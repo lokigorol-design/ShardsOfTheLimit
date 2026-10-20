@@ -71,8 +71,8 @@ namespace ShardsOfTheLimit.Tests
             Assert.That(blazeRenderer.bounds.size.y, Is.InRange(0.8f, 1.7f));
             Assert.That(blazeRenderer.bounds.size.z, Is.InRange(0.8f, 1.7f),
                 "The user-authored facing may swap model bounds, but the visual must remain cell-sized.");
-            Assert.That(blazeRenderer.bounds.min.y, Is.EqualTo(0f).Within(0.03f),
-                "The authored model must stand on the height-zero cell surface.");
+            Assert.That(blazeRenderer.bounds.min.y, Is.EqualTo(BattleTabletop.BaseHeight).Within(0.03f),
+                "The authored model must stand on its base on the height-zero cell surface.");
             Assert.That(blazeRenderer.material.GetTexture("_MainTex"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_BumpMap"), Is.Not.Null);
             Assert.That(blazeRenderer.material.GetTexture("_MetallicGlossMap"), Is.Not.Null);

@@ -6,7 +6,7 @@ Shader "Shards/ComicPost"
     Properties
     {
         _InkColor ("Ink", Color) = (0.06, 0.05, 0.07, 1)
-        _OutlineThickness ("Outline thickness (px)", Float) = 1.6
+        _OutlineThickness ("Outline thickness (px)", Float) = 1.3
         _DepthEdge ("Depth edge threshold", Float) = 0.035
         _NormalEdge ("Normal edge threshold", Float) = 0.35
         _Bands ("Light bands", Float) = 4
@@ -14,7 +14,7 @@ Shader "Shards/ComicPost"
         _Saturation ("Saturation", Float) = 1.18
         _HalftoneCell ("Halftone cell (px)", Float) = 5
         _HalftoneStart ("Halftone starts below luminance", Range(0, 1)) = 0.3
-        _HalftoneInk ("Halftone darkness", Range(0, 1)) = 0.4
+        _HalftoneInk ("Halftone darkness", Range(0, 1)) = 0.3
         _PaperTint ("Paper tint", Color) = (1, 0.97, 0.9, 1)
     }
     SubShader

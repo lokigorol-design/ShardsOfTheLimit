@@ -33,6 +33,19 @@ namespace ShardsOfTheLimit.Tests
             yield return Capture("46-comic-off.png");
 
             BattlePrototypeController.SetComicLook(true);
+
+            // The tabletop around the board: low angle towards the window, then close up on the miniatures.
+            Assert.That(GameObject.Find("Tabletop"), Is.Not.Null);
+            controller.RequestCameraTilt(-22f);
+            yield return new WaitForSeconds(0.6f);
+            yield return Capture("47-tabletop-low.png");
+            controller.RequestCameraRotation(180f);
+            yield return new WaitForSeconds(1.2f);
+            yield return Capture("48-tabletop-window.png");
+            controller.ResetCameraView();
+            controller.RequestCameraZoom(5f);
+            yield return new WaitForSeconds(0.8f);
+            yield return Capture("49-tabletop-close.png");
             LogAssert.NoUnexpectedReceived();
         }
 

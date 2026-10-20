@@ -37,7 +37,7 @@ namespace ShardsOfTheLimit.Tests
             var renderer = view.GetComponentInChildren<Renderer>();
             Assert.That(renderer.bounds.size.x,Is.InRange(.1f,1.5f));
             Assert.That(renderer.bounds.size.y,Is.InRange(.1f,1.5f));
-            Assert.That(renderer.bounds.min.y,Is.EqualTo(0).Within(.04));
+            Assert.That(renderer.bounds.min.y,Is.EqualTo(BattleTabletop.BaseHeight).Within(.04));
             Capture(Camera.main,"Blightgullet-board.png");
             Vector3 cameraPosition = Camera.main.transform.position; Quaternion cameraRotation = Camera.main.transform.rotation;
             float zoom = Camera.main.orthographicSize;

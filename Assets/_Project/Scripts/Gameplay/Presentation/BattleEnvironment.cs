@@ -46,14 +46,15 @@ namespace ShardsOfTheLimit.Presentation
             QualitySettings.antiAliasing = 4;
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.46f, 0.52f, 0.62f);
-            RenderSettings.ambientEquatorColor = new Color(0.36f, 0.34f, 0.31f);
-            RenderSettings.ambientGroundColor = new Color(0.16f, 0.14f, 0.12f);
+            // Warm kitchen light: daylight from the window plus bounce from the wooden table and the walls.
+            RenderSettings.ambientSkyColor = new Color(0.6f, 0.6f, 0.62f);
+            RenderSettings.ambientEquatorColor = new Color(0.5f, 0.42f, 0.34f);
+            RenderSettings.ambientGroundColor = new Color(0.3f, 0.22f, 0.16f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.36f, 0.4f, 0.46f);
-            RenderSettings.fogStartDistance = 22f;
-            RenderSettings.fogEndDistance = 60f;
+            RenderSettings.fogColor = new Color(0.78f, 0.7f, 0.58f);
+            RenderSettings.fogStartDistance = 60f;
+            RenderSettings.fogEndDistance = 260f;
 
             Shader skyShader = Shader.Find("Skybox/Procedural");
             if (skyShader != null)
@@ -100,13 +101,13 @@ namespace ShardsOfTheLimit.Presentation
         /// <summary>Stone material for one cell column; its colour is the tint the highlights replace.</summary>
         public static Material CreateCellMaterial(bool walkable)
         {
-            EnsureTextures();
-            var material = new Material(LitShader) { name = walkable ? "Cell Stone" : "Cell Basalt" };
-            material.mainTexture = stoneAlbedo;
-            material.SetTexture("_BumpMap", stoneNormal);
-            material.SetFloat("_BumpScale", 0.9f);
+            BattleTabletop.CardboardTextures(out Texture2D albedo, out Texture2D normal);
+            var material = new Material(LitShader) { name = walkable ? "Cell Cardboard" : "Cell Cardboard Dark" };
+            material.mainTexture = albedo;
+            material.SetTexture("_BumpMap", normal);
+            material.SetFloat("_BumpScale", 0.6f);
             material.EnableKeyword("_NORMALMAP");
-            SetSmoothness(material, walkable ? 0.12f : 0.28f);
+            SetSmoothness(material, 0.08f);
             material.SetFloat("_Metallic", 0f);
             return material;
         }

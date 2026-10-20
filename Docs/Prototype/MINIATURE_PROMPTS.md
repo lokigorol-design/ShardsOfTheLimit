@@ -15,9 +15,10 @@
 ## Общий блок стиля (вставлять в начало каждого промта)
 
 ```
-A single hand-painted tabletop miniature figure, 28mm wargame miniature style, chunky stylized proportions,
-bold readable silhouette, large clear shapes and few small details, smooth sculpted surfaces,
-vivid hand-painted colors with soft painted highlights and darker recesses, slight comic-book feel.
+A single hand-painted tabletop board-game miniature, simplified stylized sculpt like a premium board game
+figure, chunky proportions, bold readable silhouette, a few large clean shapes, smooth surfaces with almost
+no surface texture (no fine cracks, no tiny scales, no moss clumps, no grain), color and simple painted
+highlights do the work instead of sculpted detail, vivid flat-ish hand-painted colors, slight comic-book feel.
 Full body visible, standing on the ground, no base, no plinth, no text, no frame.
 Three-quarter front view, camera at eye level of the figure, centered, whole figure in frame with margin.
 Plain light grey seamless background, soft even studio lighting, no harsh shadows, no motion blur,
@@ -26,28 +27,77 @@ no other objects or characters.
 
 ## Резонанты
 
-### Blaze Worm (огненный червь)
+### Fire Worm / Magma Worm (огненный и магмовый червь)
+
+Ранги по карточке: I Нестабильное Эхо, II Пробуждение (развилка на огненную и магмовую линии), III Развитие,
+IV Аспект, V Ипостась. Твои два червя — это потолок III ранга. На IV–V червь становится почти разумным
+божеством: появляется органический доспех, «лицо» и осанка. Промт = общий стиль + основа червя + блок ранга
++ блок линии.
+
+Основа червя (всегда):
 
 ```
-Subject: a heavy fire worm creature, thick and massive like a giant grub, NOT a thin snake.
-Segmented body coiled in an S-shape with the front third raised up, covered in overlapping dark charcoal
-armor plates; glowing orange-yellow lava visible in the seams between the plates; wide round maw at the front
-ringed with short blunt teeth, warm inner glow.
-Palette: charcoal black, deep red, orange, bright yellow glow.
+Subject: a colossal volcanic worm resonant, thick and heavy like a giant grub, NOT a thin snake,
+compact body coiled in place on the ground with the front third raised up, round maw at the front.
 ```
 
-Магмовая ветка (вариант): заменить вторую строку на
-`broader body with thick basalt plates, molten magma between them, heavier blunt head`.
-
-### Primal Idol (первобытный идол)
+Блок ранга — выбрать один:
 
 ```
-Subject: an ancient stone totem idol, a tall carved pillar of earth-brown stone with a large stylized face
-(heavy brow, deep eye sockets with faint amber glow, wide flat mouth), rough chiseled edges, a few roots
-and moss growing around its lower part, simple carved tribal grooves; it floats slightly above the ground
-with small stones hovering beneath it.
-Palette: warm brown and ochre stone, green moss, amber eyes.
+Rank I-III (wild beast): plain segmented body with simple smooth plates, thin glowing seams, round maw
+with short blunt teeth, animal posture, no armor, no ornaments.
 ```
+
+```
+Rank IV - Aspect (awakened, near-sentient): the front segments are covered by grown organic armor, a fused
+carapace like a helmet and a gorget over the head, a crest of three thick horn-like plates rising behind
+the maw, two calm intelligent glowing eyes set in the armor above the maw, symmetrical rune-like glowing
+lines on the carapace; upright proud posture, the raised part held straight like a cobra, not lunging.
+```
+
+```
+Rank V - Hypostasis (living deity of the volcano): full organic armor of large polished plates along the
+whole body like a temple or a cathedral of stone, a tall crown-shaped crest behind the head, a solar halo
+ring of molten rock floating behind the crest, a calm ancient face-mask grown over the maw (the maw opens
+beneath it), glowing sigils on the plates; majestic, still, regal posture, the body coiled like a throne.
+```
+
+Блок линии — выбрать один:
+
+```
+Fire line: slimmer smoother armor, warm black and deep red plates, bright orange-yellow fire glow, flame-shaped
+crest edges.
+Palette: charcoal black, deep red, orange, bright yellow.
+```
+
+```
+Magma line: broader heavier body, thick basalt plates with molten magma between them, blunt massive head,
+crest like cooled lava rock.
+Palette: dark basalt grey, molten orange, dull red, a little gold.
+```
+
+### Primal Idol (стихийный тотем)
+
+По карточке 2.5: левитирующий шаманский тотем из **четырёх сегментов-масок — земля, огонь, ветер, молния**.
+Парение — только визуал. Порядок масок снизу вверх (земля, огонь, ветер, молния) — моё предложение.
+
+```
+Subject: a levitating shamanic totem made of four stacked carved mask segments, each mask a different element,
+one above the other, each with its own face and its own color, clearly separated by thin stone rims:
+1) bottom - EARTH mask: wide heavy stone face, square jaw, brown and ochre, small rocks orbiting it;
+2) second - FIRE mask: angry face with open mouth, red-orange, flame-shaped brows and cheeks, ember glow
+   in the eyes and mouth;
+3) third - WIND mask: serene face with closed eyes and puffed cheeks blowing, pale teal and white,
+   swirl-shaped ear plates curling outward;
+4) top - LIGHTNING mask: sharp stern face, deep blue and violet, zig-zag lightning crest on top, bright
+   electric-yellow eyes.
+The totem floats above the ground with a small gap, a few flat stones hovering under it.
+Simple bold carving, smooth stone, no moss, no roots.
+```
+
+Для IV ранга (Аспект) по карточке выбранная стихия подсвечивает верхний сегмент. Добавить в конец:
+`the top segment is replaced by the chosen element and glows strongly: ` + одно из
+`fire (Twin Eruption)`, `lightning (Storm Overcharge)`, `earth (Titan Pillar)`, `wind (Raging Tornado)`.
 
 ### Blightgullet (ядовитая жаба)
 
@@ -83,5 +133,6 @@ and from the back view, side by side, same plain light grey background and the s
   `effects sculpted as solid shapes, not particles`.
 - Для Meshy лучше всего работают изображения без перекрытий (лапы не прячутся за телом, хвост не уходит за кадр).
 
-Внешность взята из того, что есть в картах и в игре (червь — из вики: «тяжёлый червь, не тонкая змея»,
-магмовая ветка — базальтовые пластины с магмой). Остальное — моё предложение, правь под свою задумку.
+Из карточек взято: червь «тяжёлый, не тонкая змея», магмовая линия — базальтовые пластины с магмой, ранги
+червя; идол — четыре маски (земля, огонь, ветер, молния), парение, подсветка верхнего сегмента на IV ранге.
+Доспех и «божественность» червя на IV–V, порядок и облик масок, жаба и пантера — моё предложение.
